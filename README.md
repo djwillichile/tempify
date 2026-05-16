@@ -113,4 +113,10 @@ raster stacks. [Software]. DOI: 10.5281/zenodo.XXXXXXX
 
 ## Contacto
 
-Guillermo Fuentes-Jaque · ICTA Ltda. · Santiago, Chile
+**ICTA Ltda.** · Santiago, Chile · Mantenedor: Guillermo Fuentes-Jaque
+
+- Email institucional: [contacto@icta.cl](mailto:contacto@icta.cl)
+- Sitio web: [icta.cl](https://icta.cl)
+- WhatsApp: [+56 9 9292 4314](https://wa.me/56992924314)
+- Email del mantenedor: [guillermo@icta.cl](mailto:guillermo@icta.cl)
+- Issues técnicos: usa el [issue tracker de GitHub](https://github.com/djwillichile/tempify/issues) en lugar de los canales anteriores.
