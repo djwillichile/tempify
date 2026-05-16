@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import override
 
 import numpy as np
 import pytest
@@ -25,7 +24,6 @@ class _Dummy(BaseInterpolator):
 
     name = "dummy"
 
-    @override
     def interpolate(
         self,
         source: xr.DataArray,
