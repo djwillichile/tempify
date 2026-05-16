@@ -62,3 +62,50 @@ def linear_kernel(
         x_ext = np.concatenate(([x_left], x_in, [x_right]))
         return np.asarray(np.interp(x_out, x_ext, m_ext))
     return np.asarray(np.interp(x_out, x_in, m))
+
+
+def pchip_kernel(
+    m: NDArray[np.floating],
+    x_in: NDArray[np.floating],
+    x_out: NDArray[np.floating],
+    cyclic: bool,
+) -> NDArray[np.floating]:
+    """Piecewise cubic Hermite (Fritsch-Carlson) interpolation on the year axis.
+
+    Parameters
+    ----------
+    m : numpy.ndarray
+        12 monthly values placed at ``x_in``.
+    x_in : numpy.ndarray
+        Strictly increasing array of length 12 with the day-of-year of
+        each monthly anchor.
+    x_out : numpy.ndarray
+        Strictly increasing array of length N with target days-of-year.
+    cyclic : bool
+        If True, treat the year as periodic. Per design section 5.2 the
+        input nodes are padded with two wrap nodes on each side so that
+        SciPy's PCHIP delivers C1 continuity at the December-January
+        boundary. If False, SciPy's natural extrapolation is used for
+        out-of-range positions per REQ-005b.
+
+    Returns
+    -------
+    numpy.ndarray
+        Array of length ``len(x_out)`` with the interpolated values.
+    """
+    from scipy.interpolate import PchipInterpolator as ScipyPchip  # type: ignore[import-untyped]
+
+    if cyclic:
+        period = float(x_out[-1] - x_out[0]) + 1.0
+        m_ext = np.concatenate(([m[-2], m[-1]], m, [m[0], m[1]]))
+        x_ext = np.concatenate(
+            (
+                [x_in[-2] - period, x_in[-1] - period],
+                x_in,
+                [x_in[0] + period, x_in[1] + period],
+            )
+        )
+        pchip = ScipyPchip(x_ext, m_ext, extrapolate=False)
+        return np.asarray(pchip(x_out))
+    pchip = ScipyPchip(x_in, m, extrapolate=True)
+    return np.asarray(pchip(x_out))
