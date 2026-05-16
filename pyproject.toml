@@ -12,6 +12,9 @@ license = { text = "MIT" }
 authors = [
     { name = "Guillermo Fuentes-Jaque", email = "guillermo@icta.cl" }
 ]
+maintainers = [
+    { name = "ICTA Ltda.", email = "contacto@icta.cl" }
+]
 keywords = ["geospatial", "raster", "temporal", "densification", "interpolation", "climate", "worldclim", "xarray"]
 classifiers = [
     "Development Status :: 3 - Alpha",
@@ -57,10 +60,11 @@ zarr = ["zarr>=2.17"]
 tempify = "tempify.cli:app"
 
 [project.urls]
-Homepage = "https://github.com/<user>/tempify"
+Homepage = "https://github.com/djwillichile/tempify"
 Documentation = "https://tempify.readthedocs.io"
-Repository = "https://github.com/<user>/tempify"
-Issues = "https://github.com/<user>/tempify/issues"
+Repository = "https://github.com/djwillichile/tempify"
+Issues = "https://github.com/djwillichile/tempify/issues"
+Organization = "https://icta.cl"
 
 [tool.ruff]
 line-length = 100

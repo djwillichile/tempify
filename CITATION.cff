@@ -5,8 +5,15 @@ type: software
 authors:
   - family-names: "Fuentes-Jaque"
     given-names: "Guillermo"
-    email: "guillermo.f1990@gmail.com"
+    email: "guillermo@icta.cl"
+    affiliation: "ICTA Ltda., Santiago, Chile"
+    website: "https://icta.cl"
     orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO: agregar ORCID real cuando esté disponible
+contact:
+  - name: "ICTA Ltda."
+    email: "contacto@icta.cl"
+    website: "https://icta.cl"
+    tel: "+56 9 9292 4314"
 abstract: >-
   tempify realiza densificación temporal de stacks ráster geoespaciales:
   toma una serie muestreada a baja frecuencia (típicamente 12 valores mensuales)
