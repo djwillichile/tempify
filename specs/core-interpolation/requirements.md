@@ -3,7 +3,7 @@
 **Estado:** Draft
 **Owner:** Guillermo Fuentes-Jaque
 **Fecha creación:** 2026-05-15
-**Última actualización:** 2026-05-15
+**Última actualización:** 2026-05-16
 
 ## 1. Propósito
 
@@ -25,7 +25,7 @@ Implementar los cuatro métodos de interpolación temporal mensual → diaria (L
 - Otras transiciones de frecuencia (anual → mensual, daily → horario). Diferidos a futuras specs.
 - Interpolación espacial (la resolución no cambia).
 - Métodos estocásticos / weather generators.
-- Interpolación de precipitación con métodos suaves (rechazada por diseño).
+- Interpolación de precipitación con métodos suaves (rechazada por diseño). El rechazo de precipitación es enforced por `MethodVariableCompatibilityChecker` en `validation` per ADR-0004; esta spec solo provee los algoritmos.
 
 ## 3. Actores y casos de uso
 
@@ -59,13 +59,21 @@ WHEN the user invokes any interpolation method on a monthly stack, THE SYSTEM SH
 
 THE SYSTEM SHALL handle cyclic boundary conditions by default: December connects smoothly to January without extrapolation artifacts.
 
-### REQ-005 (Optional)
+### REQ-005a (Optional)
 
-WHERE the user opts out of cyclic boundary conditions, THE SYSTEM SHALL apply boundary extrapolation according to the method (constant extrapolation for linear, polynomial extrapolation for PCHIP, automatic for Fourier).
+WHERE `cyclic=False` AND method=`linear`, THE SYSTEM SHALL apply constant extrapolation at boundaries.
+
+### REQ-005b (Optional)
+
+WHERE `cyclic=False` AND method ∈ {`pchip`, `pchip_mp`}, THE SYSTEM SHALL apply Fritsch-Carlson polynomial extrapolation.
+
+### REQ-005c (Optional)
+
+WHERE `cyclic=False` AND method=`fourier`, THE SYSTEM SHALL use the natural Fourier periodic boundary (no special handling).
 
 ### REQ-006 (State-driven)
 
-WHILE applying PCHIP+Rymes-Myers, THE SYSTEM SHALL iterate until the maximum absolute difference between the reconstructed monthly mean and the original monthly value is below a configurable tolerance (default 1e-6 in the variable's units) or until reaching a maximum number of iterations (default 50).
+WHILE applying PCHIP+Rymes-Myers, THE SYSTEM SHALL iterate until the maximum absolute difference between the reconstructed monthly mean and the original monthly value is below a configurable tolerance (`convergence_tol`, default `1e-6` in the variable's units, configurable via `PchipMeanPreservingInterpolator(convergence_tol=...)`; this is the iterator's stopping criterion, NOT the contractual post-validation tolerance which lives in ADR-0010 nivel 2) or until reaching a maximum number of iterations (default 50).
 
 ### REQ-007 (Event-driven)
 
@@ -73,7 +81,11 @@ WHEN PCHIP+Rymes-Myers converges, THE SYSTEM SHALL record the number of iteratio
 
 ### REQ-008 (Unwanted)
 
-IF the input stack contains NaN values in a pixel, THEN THE SYSTEM SHALL propagate NaN to all days of that pixel in the output without attempting interpolation.
+IF the input has NaN values:
+- When ALL 12 months are NaN for a pixel: propagate NaN to all output days.
+- When SOME months are NaN for a pixel: raise `PartialNanPixelError` with the pixel index OR (configurable via `nan_policy: Literal['raise', 'propagate_all', 'skip_pixel']`) propagate accordingly.
+
+Default: `nan_policy='raise'` (fail-fast, conservative).
 
 ### REQ-009 (Unwanted)
 
@@ -81,15 +93,23 @@ IF the input stack does not contain exactly 12 months (e.g., has 11 or 13), THEN
 
 ### REQ-010 (Ubiquitous)
 
-THE SYSTEM SHALL vectorize the interpolation over the spatial dimensions using `xr.apply_ufunc` with `dask="parallelized"` to enable out-of-core processing.
+THE SYSTEM SHALL vectorize over spatial dimensions using `xr.apply_ufunc(..., dask='parallelized', dask_gufunc_kwargs={'output_sizes': {'time': target_days}})` with default chunk size from `tempify.constants.DEFAULT_CHUNK_SIZE` (configurable per call).
+
+### REQ-011 (Unwanted)
+
+IF the input stack has a non-Gregorian CF calendar (`noleap`, `360_day`, `julian`, `all_leap`), THEN THE SYSTEM SHALL raise `UnsupportedCalendarError` with a clear message in Spanish indicating which calendar was detected and that v0.1.0 supports only Gregorian/standard calendars.
+
+### REQ-012 (Unwanted)
+
+IF the input stack has duplicate or non-contiguous month coordinates (e.g., `[1,3,4,...,12]` or `[1,1,2,...]`), THEN THE SYSTEM SHALL raise `InvalidMonthlyStackError` identifying the issue.
 
 ## 5. Requisitos no funcionales
 
 | ID | Categoría | Requisito | Criterio verificable |
 |---|---|---|---|
-| NFR-001 | Performance | Procesar un stack 12×3000×500 (Chile a 2.5min) en <60s, máquina 8 cores | Benchmark `tests/benchmark/test_perf_chile_2.5min.py` |
+| NFR-001 | Performance | Procesar un stack 12×3000×500 (Chile a 2.5min) en <60s, máquina 8 cores, `scheduler='threaded'` (modo `parallel` per ADR-0007) | Benchmark `tests/benchmark/test_perf_chile_2.5min.py` |
 | NFR-002 | Reliability | Conservación de media mensual exacta en PCHIP+RM | Property test `test_rymes_myers_preserves_mean` con hypothesis |
-| NFR-003 | Reliability | Reproducibilidad bit-exact: mismos inputs producen mismo output | Test `test_reproducibility` comparando MD5 de outputs |
+| NFR-003 | Reliability | Reproducibilidad bit-exact en modo `strict` (single-thread, seeded); modo `parallel` garantiza `allclose(rtol=1e-12, atol=1e-15)` per ADR-0007 | Tests separados: `test_reproducibility_strict_md5_match`, `test_reproducibility_parallel_allclose` |
 | NFR-004 | Memory | No cargar más de 1GB en RAM por chunk con default chunk_size=512 | Profiling con memray |
 | NFR-005 | Usability | Mensajes de error en español por defecto, con código de error referenciable | Test `test_error_messages_spanish` |
 
@@ -99,15 +119,17 @@ THE SYSTEM SHALL vectorize the interpolation over the spatial dimensions using `
 - [ ] REQ-002 cubierto por test `test_base_interpolator_protocol`
 - [ ] REQ-003 cubierto por test `test_output_has_366_days_in_leap_year` y `test_output_has_365_days_in_non_leap_year`
 - [ ] REQ-004 cubierto por test `test_cyclic_boundary_continuity`
-- [ ] REQ-005 cubierto por test `test_non_cyclic_option`
+- [ ] REQ-005a/b/c cubiertos por tests `test_non_cyclic_linear_constant`, `test_non_cyclic_pchip_polynomial`, `test_non_cyclic_fourier_periodic`
 - [ ] REQ-006 cubierto por test `test_rymes_myers_converges`
 - [ ] REQ-007 cubierto por test `test_rymes_myers_records_iterations`
-- [ ] REQ-008 cubierto por test `test_nan_propagation`
+- [ ] REQ-008 cubierto por tests `test_nan_all_propagation`, `test_partial_nan_raises`, `test_nan_policy_propagate_all`, `test_nan_policy_skip_pixel`
 - [ ] REQ-009 cubierto por test `test_invalid_monthly_count_raises`
 - [ ] REQ-010 cubierto por test `test_vectorized_with_dask`
+- [ ] REQ-011 cubierto por test `test_non_gregorian_calendar_raises`
+- [ ] REQ-012 cubierto por test `test_duplicate_or_noncontiguous_months_raises`
 - [ ] NFR-001 medido y dentro del umbral
 - [ ] NFR-002 verificado con 100+ casos de hypothesis
-- [ ] NFR-003 verificado
+- [ ] NFR-003 verificado en ambos modos (`strict` y `parallel`) per ADR-0007
 - [ ] Documentación: notas metodológicas en `docs/methodology/` para cada método con referencias
 - [ ] Tutorial: notebook `docs/tutorials/01_interpolation_methods_comparison.ipynb`
 - [ ] CHANGELOG actualizado
@@ -117,7 +139,8 @@ THE SYSTEM SHALL vectorize the interpolation over the spatial dimensions using `
 ### Specs relacionadas
 
 - Bloqueada por: ninguna (es la spec fundacional).
-- Bloquea: [io-handlers](../io-handlers/requirements.md), [validation](../validation/requirements.md), [cli](../cli/requirements.md).
+- Bloquea: pipeline, [io-handlers](../io-handlers/requirements.md), [validation](../validation/requirements.md), [cli](../cli/requirements.md).
+- Independiente de: [structure-detection](../structure-detection/requirements.md) (los `BaseInterpolator` reciben `xr.DataArray` ya detectado y validado).
 
 ### Supuestos
 

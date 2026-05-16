@@ -54,7 +54,7 @@
 **Specs afectadas:** `cli`, `validation`, `core-interpolation`.
 **Descripción:** documentado en `docs/methodology/precipitation.md` pero no en ninguna spec. Requiere REQ explícito en CLI y `validation`, y ADR sobre el mecanismo.
 
-### H7 — Naming `tempifyPipeline` (minúscula inicial)
+### H7 — Naming `TempifyPipeline` (minúscula inicial)
 **Specs afectadas:** `pipeline`, `gui`, `cli`.
 **Descripción:** Viola `conventions.md §Naming` que exige PascalCase para clases. `architecture.md` la introdujo con esa minúscula. Decisión: renombrar a `TempifyPipeline` en todas las specs (fix transversal) o documentar excepción con ADR. **Recomendación: renombrar.**
 
@@ -194,7 +194,7 @@ Numeración consolidada desde ADR-0001 (existente):
 
 1. Redactar los 10 ADRs críticos en `docs/adr/0002-*.md` a `0010-*.md` y `0014-*.md` en una tanda.
 2. Crear los 4 schemas auxiliares en `docs/schemas/`.
-3. Corregir el naming `tempifyPipeline` → `TempifyPipeline` en `steering/architecture.md` y en todas las specs que lo referencian (transversal).
+3. Corregir el naming `TempifyPipeline` → `TempifyPipeline` en `steering/architecture.md` y en todas las specs que lo referencian (transversal).
 4. Aplicar las enmiendas listadas a los 9 `requirements.md` (uno por uno; la mayoría son pequeñas).
 5. Lanzar segunda pasada de Evaluador (9 agentes) verificando que cada hallazgo está cerrado.
 6. Si segunda pasada pasa: proceder a Sub-fase 1.D (gate humano spec por spec).
