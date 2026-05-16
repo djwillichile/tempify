@@ -38,6 +38,12 @@ Numerosos productos geoespaciales se distribuyen a frecuencia mensual o climatol
 - No es un weather generator estocástico (no inventa variabilidad sinóptica).
 - No interpola precipitación con métodos suaves (rechazado por diseño).
 
+## Tutorial
+
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/01-getting-started.ipynb)
+
+Tutorial completo en Jupyter notebook ejecutable en Google Colab: [`docs/tutorials/01-getting-started.ipynb`](docs/tutorials/01-getting-started.ipynb). Recorre la API pública de `tempify` v0.1.0 sobre el sample sintético WorldClim Chile Central, demuestra los cuatro métodos de interpolación, verifica la conservación de la media mensual y muestra el reporte de procedencia.
+
 ## Instalación
 
 ```bash
