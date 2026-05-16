@@ -1,7 +1,7 @@
 # Design — core-interpolation
 
 **Estado:** Draft
-**Requirements doc:** [requirements.md](requirements.md) (Approved, REQ-001..012, NFR-001..005)
+**Requirements doc:** [requirements.md](requirements.md) (Approved, REQ-001..014, NFR-001..005)
 **Última actualización:** 2026-05-15
 
 ## 1. Visión técnica
@@ -237,26 +237,52 @@ class TemporalAxis:
 
     Parameters
     ----------
-    start : str
-        ISO date string ``"YYYY-MM-DD"`` of the first day.
-    end : str
-        ISO date string ``"YYYY-MM-DD"`` of the last day (inclusive).
-    freq : Literal["D"]
-        Frequency. Only ``"D"`` (daily) supported in v0.1.0.
-    calendar : CFCalendar, default "standard"
+    start : datetime
+        First day of the axis (inclusive).
+    end : datetime
+        Last day of the axis (inclusive).
+    freq : TemporalFrequency
+        Frequency descriptor. Only daily supported in v0.1.0.
+    calendar : str, default "gregorian"
         CF calendar. ``"standard"`` and ``"gregorian"`` are aliases.
+    monthly_anchor : Literal["midpoint", "start", "end", "custom"], default "midpoint"
+        Anchor used to position each monthly input value on the X-axis of
+        the smooth interpolators (Linear, PCHIP, Fourier) per ADR-0015 and
+        REQ-013/REQ-014. ``"midpoint"`` follows the canonical table of
+        ADR-0015. The PCHIP+Rymes-Myers method operates on monthly
+        aggregates; this anchor only affects the auxiliary node
+        initialization of its iterator.
+    custom_dates : list[datetime] or None, default None
+        Required when ``monthly_anchor='custom'``. Must have length 12 (or
+        match the input length) and be strictly increasing within the year.
 
     Notes
     -----
     - ``n_days`` is derived: 365 or 366 for a single year (REQ-003).
-    - Validation of ``start <= end`` and leap-year consistency happens
-      in ``__post_init__``.
+    - Validation of ``start <= end``, leap-year consistency, and the
+      ``custom_dates`` invariants happens in ``__post_init__``.
     """
 
-    start: str
-    end: str
-    freq: Literal["D"] = "D"
-    calendar: CFCalendar = "standard"
+    start: datetime
+    end: datetime
+    freq: TemporalFrequency
+    calendar: str = "gregorian"
+    monthly_anchor: Literal["midpoint", "start", "end", "custom"] = "midpoint"
+    custom_dates: list[datetime] | None = None  # only when monthly_anchor='custom'
+
+    @classmethod
+    def from_months(
+        cls,
+        year: int,
+        anchor: Literal["midpoint", "start", "end", "custom"] = "midpoint",
+        custom_dates: list[datetime] | None = None,
+    ) -> "TemporalAxis":
+        """Construye el eje temporal a partir de un año, aplicando ADR-0015.
+
+        Resuelve el ``anchor`` solicitado en posiciones concretas sobre el
+        calendario del año dado y propaga la elección al eje que consumirán
+        los interpoladores suaves (REQ-013, REQ-014).
+        """
 
     @property
     def n_days(self) -> int: ...
@@ -280,6 +306,26 @@ FOURIER_MAX_HARMONICS: Final[int] = 5
 ## 5. Algoritmos clave
 
 Convención común: el kernel 1D recibe un vector `m ∈ R^12` (valor mensual centrado en el día medio de cada mes) y devuelve un vector `d ∈ R^N` con `N ∈ {365, 366}`. Los nodos del input se ubican en el día central de cada mes según el calendario (DOYs `[15.5, 45.0, 74.5, ...]` para año no bisiesto; `[15.5, 45.5, 75.5, ...]` para bisiesto). Esto preserva la semántica "valor mensual = promedio del mes".
+
+### 5.0 Paso 0: Posicionamiento de nodos de entrada (REQ-013, REQ-014)
+
+Antes de invocar el kernel matemático de Linear, PCHIP o Fourier, la fachada construye el eje X de los nodos de entrada a partir del `TemporalAxis.monthly_anchor` (per ADR-0015):
+
+```
+Dado el TemporalAxis del input y el monthly_anchor:
+- midpoint (default): X_i = midpoint(year, month_i)  per ADR-0015 tabla canónica
+- start:               X_i = primer día del mes_i
+- end:                 X_i = último día del mes_i
+- custom:              X_i = custom_dates[i]
+El array X es el eje del interpolador; el array Y son los valores monthly del DataArray.
+```
+
+Validaciones añadidas en este paso:
+- `monthly_anchor='custom'` exige `custom_dates is not None` y `len(custom_dates) == len(source['month'])`; en caso contrario `ValueError`.
+- `custom_dates` debe ser estrictamente creciente dentro del año del eje.
+- El eje X resultante se serializa en `attrs["tempify_monthly_anchor"]` para trazabilidad.
+
+El método PCHIP+Rymes-Myers (§5.3) **opera sobre agregados mensuales** y no consume directamente este eje X; la elección de `monthly_anchor` solo afecta los nodos auxiliares con los que se inicializa el iterator (la pasada PCHIP previa a la corrección iterativa).
 
 ### 5.1 Linear
 
@@ -316,6 +362,8 @@ Delegación en `scipy.interpolate.PchipInterpolator`. Para soporte cíclico se c
 ### 5.3 PCHIP + Rymes-Myers (mean-preserving)
 
 Algoritmo iterativo que parte de PCHIP suave y aplica una corrección aditiva por mes para forzar conservación de la media. Implementación basada en Rymes & Myers (2001).
+
+**Relación con el `monthly_anchor` (REQ-013):** este método opera sobre la **media del periodo** (no sobre nodos puntuales como Linear/PCHIP/Fourier), por lo que la elección de `monthly_anchor` *no* aparece en el bucle iterativo. El anchor solo influye en la inicialización: la pasada PCHIP previa que genera los nodos auxiliares con los que arranca la corrección. La conservación de media exacta (REQ-006) es por construcción **independiente** de la elección de anchor; cambiar `monthly_anchor` puede modificar la trayectoria diaria intermedia pero no la propiedad `mean(y | mom==j) == m[j]` que el iterator fuerza al converger.
 
 ```
 input:  m[1..12], target axis with DOYs d_t and month-of-day mapping mom[t]
@@ -425,6 +473,17 @@ Validación: `FOURIER_MIN_HARMONICS <= n_harmonics <= FOURIER_MAX_HARMONICS` (1.
 **Razón:** los kernels son matemáticamente densos; tenerlos como funciones puras NumPy permite tests unitarios rápidos sin sobrecoste de xarray/Dask, y permite property-based testing con hypothesis directamente sobre el kernel.
 **Trade-offs:** una indirección extra; documentación del contrato kernel ↔ fachada.
 
+### Decisión 5: Convención de posicionamiento midpoint (REQ-013, ADR-0015)
+
+**Opciones consideradas:**
+1. **Midpoint canónico** por mes calendario (per ADR-0015 tabla, con día 15 para febrero ajustado por bisiestos).
+2. **Día 15 fijo** en todos los meses (independiente de la longitud del mes).
+3. **Inicio de mes** (día 1) como anchor por defecto.
+
+**Decisión:** opción 1 (midpoint), exposición opcional de las otras vía `monthly_anchor` (REQ-014).
+**Razón:** la semántica "valor mensual = promedio del mes" se mapea sin sesgo al punto medio del mes. Día 15 fijo introduce un sesgo asimétrico medio de ~0.5 días en meses de 31 días y ~−0.5 en febrero, que se acumula en métodos suaves. Inicio de mes empuja los nodos hacia adelante 14–15 días y produce un desfase sistemático del ciclo anual reconstruido (visible en el cruce por cero de la derivada en derivadas climatológicas).
+**Trade-offs:** los midpoints no son enteros en meses pares ni equiespaciados, lo que requiere DOYs flotantes y atención al cierre cíclico (gestionado en §5.2 y §5.4). Se acepta a cambio de la corrección estadística. Casos donde el usuario tenga semántica distinta (e.g., valor reportado al primer día del mes) se cubren con `monthly_anchor='start'` o `'custom'`.
+
 ## 7. Estrategia de testing
 
 ### 7.1 Tests unitarios (`tests/unit/interpolation/`)
@@ -454,6 +513,11 @@ Cobertura por método y por requisito:
 - `test_vectorized_with_dask` (REQ-010) — el `xr.DataArray` retornado es lazy (`isinstance(da.data, dask.array.Array)`); resultado tras `.compute()` coincide con eager.
 - `test_fourier_n_harmonics_out_of_range` — `n_harmonics ∈ {0, 6, 100}` ⇒ `ValueError`.
 - `test_error_messages_spanish` (NFR-005) — todas las excepciones tipadas llevan mensaje en español.
+- `test_temporal_axis_midpoint_table` (REQ-013) — verifica los 12 midpoints generados por `TemporalAxis.from_months(year=2023, anchor='midpoint')` contra la tabla canónica de ADR-0015.
+- `test_temporal_axis_leap_year_february_midpoint_day_15` (REQ-013) — `from_months(year=2024, anchor='midpoint')` ubica el midpoint de febrero en el día 15 (no 14.5) per ADR-0015 sección bisiestos.
+- `test_linear_input_nodes_at_midpoint` (REQ-013) — el `LinearInterpolator` por defecto posiciona los nodos de entrada en los midpoints canónicos; el eje X interno coincide con `TemporalAxis.from_months(...).monthly_anchor_doys()`.
+- `test_monthly_anchor_start_shifts_nodes` (REQ-014) — con `monthly_anchor='start'`, los nodos quedan en el día 1 de cada mes; el output diario muestra el desfase esperado vs `'midpoint'`.
+- `test_custom_anchor_requires_explicit_dates` (REQ-014) — `monthly_anchor='custom'` sin `custom_dates` ⇒ `ValueError`; con `custom_dates` de longitud ≠ 12 ⇒ `ValueError`; con `custom_dates` no crecientes ⇒ `ValueError`.
 
 ### 7.2 Tests property-based (`tests/unit/interpolation/test_properties.py`, con `hypothesis`)
 
@@ -520,6 +584,8 @@ N/A. Esta spec es la primera implementación de Capa 4. No hay código previo qu
 | REQ-010 | `xr.apply_ufunc(..., dask='parallelized')` | `test_vectorized_with_dask` |
 | REQ-011 | `_validate_calendar` en `BaseInterpolator` | `test_non_gregorian_calendar_raises` |
 | REQ-012 | `_validate_month_contiguity` | `test_duplicate_or_noncontiguous_months_raises` |
+| REQ-013 | `TemporalAxis.from_months(anchor='midpoint')`, paso 0 §5.0 en Linear/PCHIP/Fourier | `test_temporal_axis_midpoint_table`, `test_temporal_axis_leap_year_february_midpoint_day_15`, `test_linear_input_nodes_at_midpoint` |
+| REQ-014 | `TemporalAxis.monthly_anchor`, validación de `custom_dates` | `test_monthly_anchor_start_shifts_nodes`, `test_custom_anchor_requires_explicit_dates` |
 | NFR-001 | Defaults de chunking + scheduler `threaded` | `tests/benchmark/test_perf_chile_2.5min.py` |
 | NFR-002 | Iterador Rymes-Myers con `convergence_tol` | `test_rymes_myers_preserves_mean` (hypothesis) |
 | NFR-003 | Compatibilidad con `reproducibility_context` (Capa 5) | `test_reproducibility_strict_md5_match`, `test_reproducibility_parallel_allclose` |
@@ -533,6 +599,8 @@ N/A. Esta spec es la primera implementación de Capa 4. No hay código previo qu
 - ADR-0004 — Política de precipitación (rechazo se enforça en Capa 3, NO aquí).
 - ADR-0007 — Política de reproducibilidad de dos modos.
 - ADR-0010 — Tolerancia de conservación de la media en tres niveles.
+- ADR-0015 — Convención midpoint para el posicionamiento temporal de valores mensuales.
+- CF Conventions §7.4 — Climatological statistics.
 - Fritsch, F. N., & Carlson, R. E. (1980). Monotone piecewise cubic interpolation. *SIAM J. Numer. Anal.*, 17(2), 238-246.
 - Rymes, M. D., & Myers, D. R. (2001). Mean preserving algorithm for smoothly interpolating averaged data. *Solar Energy*, 71(4), 225-231.
 - `docs/methodology/empirical-validation-quinta-normal.md`.

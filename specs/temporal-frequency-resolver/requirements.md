@@ -21,6 +21,7 @@ Inferir la frecuencia temporal de los datos de entrada siguiendo una jerarquía 
 - Output explícito `ResolutionResult` dataclass con frecuencia, tier ganador, confianza y evidencia textual corta.
 - Registry extensible (`FrequencyParserRegistry`) que permite añadir parsers de terceros vía entry points o registro programático.
 - Política de desempate entre tiers en conflicto: `cf_units > nomenclature > count_heuristic > callback`.
+- Extracción de eje temporal concreto (fechas) desde filenames y descripciones de bandas, no solo inferencia de frecuencia.
 
 ### Out-of-scope
 
@@ -108,6 +109,18 @@ THE SYSTEM SHALL ship with the following four built-in filename parsers, each im
 
 Las regex listadas son ilustrativas: la implementación de cada parser puede ser más permisiva o estricta, pero SHALL documentar su patrón en el docstring y SHALL ser cubierta por la property test de NFR-002.
 
+### REQ-011 (Ubiquitous)
+
+THE SYSTEM SHALL extract a `time_axis: list[datetime]` from filenames when the matched parser supports date encoding (e.g., WorldClim/CHELSA/CHIRPS/ERA5 patterns include year/month/day/hour groups). When only month-of-year is encoded without a year, the system applies the canonical midpoint convention (per ADR-0015) and emits a warning that the axis is calendar-agnostic.
+
+### REQ-012 (Optional, WHERE)
+
+WHERE the user passes `monthly_anchor: Literal['midpoint','start','end','custom']` in `PipelineConfig`, THE SYSTEM SHALL apply that anchor when constructing time points from monthly aggregates; default is `midpoint` per ADR-0015.
+
+### REQ-013 (Event-driven)
+
+WHEN a multi-band GeoTIFF is the input (mode A), AND the bands carry descriptions (`GDAL_BAND_DESCRIPTIONS`) parseable as ISO dates, THE SYSTEM SHALL use those descriptions as the time axis preferring this source over filename parsing.
+
 ## 5. Requisitos no funcionales
 
 | ID | Categoría | Requisito | Criterio verificable |
@@ -145,6 +158,7 @@ Trazabilidad REQ → test (cada REQ tiene al menos un test nombrado en `tests/de
 
 - **Bloqueada por:** [io-handlers](../io-handlers/requirements.md) (necesita lectura previa de metadata CF por los readers de la Capa 1).
 - **Bloquea:** [structure-detection](../structure-detection/requirements.md) (el `StructureDetector` consume el `ResolutionResult` para poblar el `DetectionResult`), [pipeline](../pipeline/requirements.md), [cli](../cli/requirements.md), [gui](../gui/requirements.md).
+- **Depende de:** ADR-0015 (`docs/adr/0015-monthly-value-temporal-placement.md`) para la convención de midpoint aplicada a agregados mensuales sin día explícito.
 
 ### Supuestos
 
@@ -170,5 +184,7 @@ Trazabilidad REQ → test (cada REQ tiene al menos un test nombrado en `tests/de
 - Schema canónico: `docs/schemas/detection-result.schema.md` (enum `TemporalFrequency`, claves `temporal_frequency` y `temporal_frequency_tier`).
 - Steering: `steering/architecture.md` § Capa 2 Detection, sub-componente `TemporalFrequencyResolver`.
 - CF Conventions: https://cfconventions.org/
+- CF Conventions 7.4 (Climatological Statistics): https://cfconventions.org/Data/cf-conventions/cf-conventions-1.10/cf-conventions.html#climatological-statistics
+- ADR-0015: Monthly value temporal placement (midpoint convention) — `docs/adr/0015-monthly-value-temporal-placement.md`.
 - EARS notation: https://alistairmavin.com/ears/
 - PEP 621 (entry points en `pyproject.toml`): https://peps.python.org/pep-0621/

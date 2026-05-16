@@ -218,12 +218,25 @@ class StructureDetectionResult:
     metadata_index
         Map Path -> RasterMetadata as read from io-handlers. Cached so
         downstream consumers do not re-open the files.
+    band_descriptions
+        Optional ordered list of GDAL band descriptions, only populated
+        when structure_mode == SINGLE_STACK and the source is a
+        multiband GeoTIFF whose bands carry `GDAL_BAND_DESCRIPTIONS`.
+        Consumed by TemporalFrequencyResolver to produce a real
+        `time_axis` instead of falling back to the proxy-year midpoint
+        synthesis (per ADR-0015 §3 override-by-file).
     """
     structure_mode: StructureMode
     files: list[Path]
     confidence: StructureConfidencePartial  # TypedDict with structure_mode + homogeneity
     evidence: dict[str, str]
     metadata_index: dict[Path, RasterMetadata]
+    # Descriptores por banda (solo modo A multibanda GeoTIFF). None en modo B/C
+    # o cuando el GeoTIFF no expone descriptions. Cuando está poblado, el
+    # pipeline lo propaga al TemporalFrequencyResolver para activar el
+    # parser MultiBandGeoTIFFBandDescriptionParser (Tier 2). Ver ADR-0015 y
+    # specs/temporal-frequency-resolver/design.md.
+    band_descriptions: list[str] | None = None
 ```
 
 ### `StructureConfidencePartial` (TypedDict)
@@ -338,6 +351,11 @@ Cuando el archivo es un GeoTIFF con `band_count >= 2`:
 1. Se clasifica como A independientemente de la semántica de bandas.
 2. La semántica temporal se delega: si hay `disambiguation_callback` y la Capa 2 detecta ambigüedad de bandas (sin metadata CF y nomenclatura no-conclusiva), se invoca el callback con el reporte. En contraposición, si el callback no resuelve, se emite warning y se anota en `evidence["structure_mode"]` para que `TemporalFrequencyResolver` (Capa 2 también, otra spec) decida en su tier interactivo.
 3. La confianza `structure_mode` se reduce en `-0.1` cuando la semántica de bandas no es confirmable, manteniendo la cota `[0.0, 1.0]`.
+4. **Extracción de `GDAL_BAND_DESCRIPTIONS` (ADR-0015 + `temporal-frequency-resolver`).** Si las bandas exponen `GDAL_BAND_DESCRIPTIONS` parseables como fechas (o metadata equivalente `RasterBand.GetDescription()` por banda), `StructureDetector` extrae la lista ordenada de strings y la propaga al `TemporalFrequencyResolver` como input `band_descriptions: list[str] | None`. Esto activa el parser `MultiBandGeoTIFFBandDescriptionParser` (Tier 2 del resolver) y permite construir `time_axis` real en lugar de caer al año proxy. Si las descripciones existen pero no son parseables, se almacenan igualmente en `StructureDetectionResult.band_descriptions` para diagnóstico y se anota en `evidence`; el resolver decidirá si activa otro parser o cae a heurística.
+
+### Algoritmo 3b: Modo B (colección) y entrega de filenames al resolver
+
+En modo B (colección de monocapas), `StructureDetector` pasa al `TemporalFrequencyResolver` la lista ordenada de filenames (`StructureDetectionResult.files`) sin abrir los archivos. El resolver consume esos nombres en Tier 2 (parsers built-in: WorldClim, CHELSA, CHIRPS, ERA5) para extraer `time_axis` cuando la nomenclatura es parseable. Esto es coherente con el principio de "Capa 2 no abre rásteres" (solo headers vía `io.metadata`): los nombres son strings ya disponibles en el `metadata_index`. El contrato es: `StructureDetector` provee `files` ordenados (NFC) al `TemporalFrequencyResolver.resolve(files=..., cf_metadata=..., band_descriptions=...)` y este último elige el tier ganador.
 
 ### Algoritmo 4: Confidence scoring (pseudocódigo ADR-0008)
 
