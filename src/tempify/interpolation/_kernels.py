@@ -109,3 +109,53 @@ def pchip_kernel(
         return np.asarray(pchip(x_out))
     pchip = ScipyPchip(x_in, m, extrapolate=True)
     return np.asarray(pchip(x_out))
+
+
+def fourier_kernel(
+    m: NDArray[np.floating],
+    x_in: NDArray[np.floating],
+    x_out: NDArray[np.floating],
+    n_harmonics: int,
+) -> NDArray[np.floating]:
+    """Truncated Fourier series interpolation via numpy.fft.rfft.
+
+    The 12 monthly inputs are treated as periodic samples of an annual
+    signal. The first ``n_harmonics`` positive-frequency coefficients
+    (plus the DC term) are kept and used to synthesize values at
+    arbitrary daily positions. Fourier is inherently periodic so there
+    is no separate cyclic vs non-cyclic mode; the FFT semantics handle
+    the year wraparound implicitly (per ADR-0016 stamp ``fft_implicit``).
+
+    Parameters
+    ----------
+    m : numpy.ndarray
+        12 monthly values (FFT requires uniformly spaced samples; we
+        treat the monthly anchors as approximately uniform — the small
+        non-uniformity from midpoint dates per ADR-0015 is absorbed via
+        the explicit ``x_in`` re-projection below).
+    x_in : numpy.ndarray
+        Day-of-year of each monthly anchor (length 12).
+    x_out : numpy.ndarray
+        Day-of-year targets (length N).
+    n_harmonics : int
+        Number of positive-frequency harmonics to retain. Must be in
+        ``[FOURIER_MIN_HARMONICS, FOURIER_MAX_HARMONICS]``. The DC term
+        is always kept.
+
+    Returns
+    -------
+    numpy.ndarray
+        Array of length ``len(x_out)`` with the reconstructed values.
+    """
+    n = m.size
+    coeffs = np.fft.rfft(m)
+    period = float(x_out[-1] - x_out[0]) + 1.0
+    t = (x_out - x_in[0]) / period * n
+    result = np.full(x_out.size, float(np.real(coeffs[0])) / n, dtype=np.float64)
+    max_k = min(n_harmonics, n // 2)
+    for k in range(1, max_k + 1):
+        c = coeffs[k]
+        factor = 2.0 / n if (n % 2 != 0 or k < n // 2) else 1.0 / n
+        angle = 2.0 * np.pi * k * t / n
+        result += factor * (float(np.real(c)) * np.cos(angle) - float(np.imag(c)) * np.sin(angle))
+    return result
