@@ -1,0 +1,57 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+dist/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+.coverage.*
+htmlcov/
+
+# Virtual envs
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Datos grandes (no commitear datasets reales)
+data/
+*.nc
+*.tif
+*.tiff
+*.h5
+*.hdf5
+*.zarr/
+
+# Excepciones: fixtures pequeñas SÍ se commitean
+!tests/fixtures/*.nc
+!tests/fixtures/*.tif
+
+# Outputs locales
+output/
+out/
+results/
+
+# Logs
+*.log
+
+# Harness state (notas efímeras de sesión)
+.claude/state/session-notes.md
+.claude/state/*.tmp
+
+# Sphinx
+docs/_build/

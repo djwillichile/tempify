@@ -1,0 +1,139 @@
+# Requirements — core-interpolation
+
+**Estado:** Draft
+**Owner:** Guillermo Fuentes-Jaque
+**Fecha creación:** 2026-05-15
+**Última actualización:** 2026-05-15
+
+## 1. Propósito
+
+Implementar los cuatro métodos de interpolación temporal mensual → diaria (Lineal, PCHIP, PCHIP + Rymes-Myers mean-preserving, Fourier multi-armónico) validados experimentalmente sobre datos reales (Quinta Normal 2020) y sintéticos (stack 3×3). Esta spec es el corazón funcional del software; todas las demás specs orbitan alrededor de ella.
+
+## 2. Alcance
+
+### In-scope
+
+- Cuatro métodos de interpolación temporal mensual → diaria.
+- Soporte para nodos cíclicos (cierre del año).
+- Vectorización píxel a píxel sobre `xr.DataArray` con `(month, y, x)`.
+- Conservación de la media mensual exacta en el método PCHIP+RM.
+- Manejo correcto de años bisiestos vs no bisiestos (365 vs 366 días).
+- Propagación correcta de NoData.
+
+### Out-of-scope
+
+- Otras transiciones de frecuencia (anual → mensual, daily → horario). Diferidos a futuras specs.
+- Interpolación espacial (la resolución no cambia).
+- Métodos estocásticos / weather generators.
+- Interpolación de precipitación con métodos suaves (rechazada por diseño).
+
+## 3. Actores y casos de uso
+
+### Actor 1: Investigador en climatología aplicada
+
+> Como investigador, quiero convertir un stack mensual WorldClim a diario preservando la media mensual, para alimentar modelos de fenología que requieren temperatura diaria sin introducir sesgo en agregados mensuales.
+
+**Caso de uso típico:** El investigador carga el stack mensual con `xarray`, llama a `interpolate(stack, target_freq="daily", method="pchip_mp")`, y obtiene un `DataArray` diario que al re-agregar por mes coincide con el original.
+
+### Actor 2: Docente
+
+> Como docente, quiero mostrar a estudiantes las diferencias entre métodos de interpolación temporal, para enseñar conceptos de conservación de propiedades estadísticas en agregaciones.
+
+**Caso de uso típico:** El docente compara visualmente los 4 métodos sobre un dataset pequeño y muestra las métricas de error.
+
+## 4. Requisitos funcionales (formato EARS)
+
+### REQ-001 (Ubiquitous)
+
+THE SYSTEM SHALL provide four interpolation methods: linear, PCHIP, PCHIP+Rymes-Myers (mean-preserving), and Fourier with configurable number of harmonics (1 to 5).
+
+### REQ-002 (Ubiquitous)
+
+THE SYSTEM SHALL expose all interpolation methods through a common interface `BaseInterpolator.interpolate(source: xr.DataArray, target_axis: TemporalAxis) -> xr.DataArray`.
+
+### REQ-003 (Event-driven)
+
+WHEN the user invokes any interpolation method on a monthly stack, THE SYSTEM SHALL return a daily stack with dimensions `(time, y, x)`, where `time` is a CF-compliant daily index covering either 365 or 366 days according to whether the target year is a leap year.
+
+### REQ-004 (Ubiquitous)
+
+THE SYSTEM SHALL handle cyclic boundary conditions by default: December connects smoothly to January without extrapolation artifacts.
+
+### REQ-005 (Optional)
+
+WHERE the user opts out of cyclic boundary conditions, THE SYSTEM SHALL apply boundary extrapolation according to the method (constant extrapolation for linear, polynomial extrapolation for PCHIP, automatic for Fourier).
+
+### REQ-006 (State-driven)
+
+WHILE applying PCHIP+Rymes-Myers, THE SYSTEM SHALL iterate until the maximum absolute difference between the reconstructed monthly mean and the original monthly value is below a configurable tolerance (default 1e-6 in the variable's units) or until reaching a maximum number of iterations (default 50).
+
+### REQ-007 (Event-driven)
+
+WHEN PCHIP+Rymes-Myers converges, THE SYSTEM SHALL record the number of iterations used in the output `DataArray.attrs["rymes_myers_iterations"]`.
+
+### REQ-008 (Unwanted)
+
+IF the input stack contains NaN values in a pixel, THEN THE SYSTEM SHALL propagate NaN to all days of that pixel in the output without attempting interpolation.
+
+### REQ-009 (Unwanted)
+
+IF the input stack does not contain exactly 12 months (e.g., has 11 or 13), THEN THE SYSTEM SHALL raise `InvalidMonthlyStackError` with a clear message identifying the issue.
+
+### REQ-010 (Ubiquitous)
+
+THE SYSTEM SHALL vectorize the interpolation over the spatial dimensions using `xr.apply_ufunc` with `dask="parallelized"` to enable out-of-core processing.
+
+## 5. Requisitos no funcionales
+
+| ID | Categoría | Requisito | Criterio verificable |
+|---|---|---|---|
+| NFR-001 | Performance | Procesar un stack 12×3000×500 (Chile a 2.5min) en <60s, máquina 8 cores | Benchmark `tests/benchmark/test_perf_chile_2.5min.py` |
+| NFR-002 | Reliability | Conservación de media mensual exacta en PCHIP+RM | Property test `test_rymes_myers_preserves_mean` con hypothesis |
+| NFR-003 | Reliability | Reproducibilidad bit-exact: mismos inputs producen mismo output | Test `test_reproducibility` comparando MD5 de outputs |
+| NFR-004 | Memory | No cargar más de 1GB en RAM por chunk con default chunk_size=512 | Profiling con memray |
+| NFR-005 | Usability | Mensajes de error en español por defecto, con código de error referenciable | Test `test_error_messages_spanish` |
+
+## 6. Criterios de aceptación
+
+- [ ] REQ-001 cubierto por tests `test_linear_basic`, `test_pchip_basic`, `test_pchip_mp_basic`, `test_fourier_basic`
+- [ ] REQ-002 cubierto por test `test_base_interpolator_protocol`
+- [ ] REQ-003 cubierto por test `test_output_has_366_days_in_leap_year` y `test_output_has_365_days_in_non_leap_year`
+- [ ] REQ-004 cubierto por test `test_cyclic_boundary_continuity`
+- [ ] REQ-005 cubierto por test `test_non_cyclic_option`
+- [ ] REQ-006 cubierto por test `test_rymes_myers_converges`
+- [ ] REQ-007 cubierto por test `test_rymes_myers_records_iterations`
+- [ ] REQ-008 cubierto por test `test_nan_propagation`
+- [ ] REQ-009 cubierto por test `test_invalid_monthly_count_raises`
+- [ ] REQ-010 cubierto por test `test_vectorized_with_dask`
+- [ ] NFR-001 medido y dentro del umbral
+- [ ] NFR-002 verificado con 100+ casos de hypothesis
+- [ ] NFR-003 verificado
+- [ ] Documentación: notas metodológicas en `docs/methodology/` para cada método con referencias
+- [ ] Tutorial: notebook `docs/tutorials/01_interpolation_methods_comparison.ipynb`
+- [ ] CHANGELOG actualizado
+
+## 7. Dependencias y supuestos
+
+### Specs relacionadas
+
+- Bloqueada por: ninguna (es la spec fundacional).
+- Bloquea: [io-handlers](../io-handlers/requirements.md), [validation](../validation/requirements.md), [cli](../cli/requirements.md).
+
+### Supuestos
+
+- El usuario entiende que ningún método mensual→diario puede recuperar la varianza sinóptica diaria real. Esto se comunica claramente en la documentación.
+- Para v1.0 solo se soporta transición 12 meses → 365/366 días. Otras transiciones diferidas.
+
+### Riesgos
+
+| Riesgo | Probabilidad | Impacto | Mitigación |
+|---|---|---|---|
+| Pérdida de varianza diaria interpretada como "bug" por usuarios sin contexto | Media | Medio | Documentación clara + reporte automático que comunica la limitación intrínseca |
+| Rymes-Myers no converge en casos patológicos | Baja | Medio | Tope de iteraciones + log warning; retornar mejor aproximación |
+| Performance Dask pobre por chunks mal dimensionados | Media | Bajo | chunk_size configurable + recomendación en docs |
+
+## 8. Referencias
+
+- Fritsch, F. N., & Carlson, R. E. (1980). Monotone piecewise cubic interpolation. *SIAM Journal on Numerical Analysis*, 17(2), 238-246.
+- Rymes, M. D., & Myers, D. R. (2001). Mean preserving algorithm for smoothly interpolating averaged data. *Solar Energy*, 71(4), 225-231.
+- Validación experimental previa: experimento Quinta Normal 2020 (ver `docs/methodology/empirical-validation-quinta-normal.md`).
