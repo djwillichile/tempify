@@ -41,15 +41,15 @@ Este loop se repite por cada task. **No combinar tasks.**
 
 | Spec | Estado | Descripción |
 |------|--------|-------------|
-| [core-interpolation](specs/core-interpolation/requirements.md) | Draft (auditada, enmendada) | 4 métodos de interpolación temporal (Lineal, PCHIP, PCHIP+RM, Fourier) |
-| [io-handlers](specs/io-handlers/requirements.md) | Draft (auditada, enmendada) | Lectores y escritores (GeoTIFF, NetCDF, Zarr) |
-| [validation](specs/validation/requirements.md) | Draft (auditada, enmendada) | Coherencia geoespacial + post-interpolación |
-| [structure-detection](specs/structure-detection/requirements.md) | Draft (auditada, enmendada) | Detección stack único vs colección de monocapas |
-| [temporal-frequency-resolver](specs/temporal-frequency-resolver/requirements.md) | Draft (auditada, enmendada) | Inferencia de frecuencia (CF → nomenclatura → heurística → prompt) |
-| [pipeline](specs/pipeline/requirements.md) | Draft | Orquestación end-to-end (`TempifyPipeline`) y generación de reporte |
-| [cli](specs/cli/requirements.md) | Draft (auditada, enmendada) | Interfaz de línea de comandos en español (Typer + Rich) |
-| [gui](specs/gui/requirements.md) | Draft | Interfaz gráfica de escritorio en español (PySide6) |
-| [packaging](specs/packaging/requirements.md) | Draft | Empaquetado para Windows (PyInstaller `--onedir` + Inno Setup) |
+| [core-interpolation](specs/core-interpolation/requirements.md) | Approved | 4 métodos de interpolación temporal (Lineal, PCHIP, PCHIP+RM, Fourier) |
+| [io-handlers](specs/io-handlers/requirements.md) | Approved | Lectores y escritores (GeoTIFF, NetCDF, Zarr) |
+| [validation](specs/validation/requirements.md) | Approved | Coherencia geoespacial + post-interpolación |
+| [structure-detection](specs/structure-detection/requirements.md) | Approved | Detección stack único vs colección de monocapas |
+| [temporal-frequency-resolver](specs/temporal-frequency-resolver/requirements.md) | Approved | Inferencia de frecuencia (CF → nomenclatura → heurística → prompt) |
+| [pipeline](specs/pipeline/requirements.md) | Approved | Orquestación end-to-end (`TempifyPipeline`) y generación de reporte |
+| [cli](specs/cli/requirements.md) | Approved | Interfaz de línea de comandos en español (Typer + Rich) |
+| [gui](specs/gui/requirements.md) | Approved | Interfaz gráfica de escritorio en español (PySide6) |
+| [packaging](specs/packaging/requirements.md) | Approved | Empaquetado para Windows (PyInstaller `--onedir` + Inno Setup) |
 
 **Auditoría de Fase 1:** [specs/_audit/2026-05-16-requirements-audit.md](specs/_audit/2026-05-16-requirements-audit.md)
 **ADRs vigentes:** 0001 (xarray), 0002 (Dask), 0003 (Typer), 0004 (precipitación), 0005 (PySide6), 0006 (PyInstaller+Inno), 0007 (reproducibilidad), 0008 (confidence scoring), 0009 (tolerancias geo), 0010 (conservación de media), 0014 (`TempifyPipeline`).

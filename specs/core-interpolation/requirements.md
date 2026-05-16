@@ -1,6 +1,6 @@
-# Requirements — core-interpolation
+﻿# Requirements — core-interpolation
 
-**Estado:** Draft
+**Estado:** Approved
 **Owner:** Guillermo Fuentes-Jaque
 **Fecha creación:** 2026-05-15
 **Última actualización:** 2026-05-16
