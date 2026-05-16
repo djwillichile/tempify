@@ -117,7 +117,7 @@ class BaseInterpolator(ABC):
 **Responsabilidad:** orquestar end-to-end y producir reporte.
 
 ```python
-class tempifyPipeline:
+class TempifyPipeline:
     def __init__(self, config: PipelineConfig): ...
 
     def run(self, source: Path | list[Path]) -> PipelineResult:

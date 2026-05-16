@@ -3,7 +3,7 @@
 **Estado:** Draft
 **Owner:** Guillermo Fuentes-Jaque
 **Fecha creación:** 2026-05-15
-**Última actualización:** 2026-05-15
+**Última actualización:** 2026-05-16
 
 ## 1. Propósito
 
@@ -34,7 +34,7 @@ Implementar lectores y escritores para los formatos soportados (GeoTIFF, NetCDF,
 
 ### REQ-001 (Ubiquitous)
 
-THE SYSTEM SHALL expose readers and writers through the `BaseReader` and `BaseWriter` Protocol interfaces.
+THE SYSTEM SHALL expose readers and writers through the `BaseReader` and `BaseWriter` Protocol interfaces, declaring at minimum the methods `read(source) -> xr.DataArray` and `metadata() -> dict` on `BaseReader`, and `write(data, target) -> None` on `BaseWriter`.
 
 ### REQ-002 (Ubiquitous)
 
@@ -56,17 +56,47 @@ WHEN writing a GeoTIFF collection, THE SYSTEM SHALL use configurable filename te
 
 IF a target file exists and `overwrite=False`, THEN THE SYSTEM SHALL raise `FileExistsError` without modifying the file.
 
+### REQ-007 (Event-driven)
+
+WHEN writing NetCDF output, THE SYSTEM SHALL include CF-compliant attributes: `units`, `calendar`, `_FillValue`, `standard_name`, `long_name`, and `grid_mapping` referencing the CRS.
+
+### REQ-008 (Ubiquitous)
+
+THE SYSTEM SHALL preserve the CRS across multi-file concat operations and in any write operation, using the `rio` accessor.
+
+### REQ-009 (Optional)
+
+WHERE the optional extra `[zarr]` is installed, THE SYSTEM SHALL expose `ZarrWriter` for chunked out-of-core writing.
+
+### REQ-010 (Ubiquitous)
+
+THE SYSTEM SHALL serialize provenance metadata as NetCDF attributes (`tempify_version`, `tempify_method`, `tempify_params`, `tempify_md5_inputs`, `tempify_timestamp_utc`) for NetCDF/Zarr outputs, and as a sidecar `.json` file alongside each GeoTIFF output.
+
 ## 5. Requisitos no funcionales
 
 | ID | Categoría | Requisito | Criterio verificable |
 |---|---|---|---|
-| NFR-001 | Reliability | Todas las decisiones deben ser trazables en el reporte de procesamiento | Inspección manual del reporte generado |
-| NFR-002 | Usability | Mensajes de error en español, con código referenciable | Test `test_error_messages_spanish` |
+| NFR-001 | Reliability | Roundtrip bit-exact lectura→escritura→lectura preserva datos y metadata | Test `test_roundtrip_netcdf_preserves_attrs_and_values` |
+| NFR-002 | Performance | Lectura de stack 12×3000×500 GeoTIFF en <5s sobre SSD | Benchmark `bench_read_geotiff_stack_12x3000x500` |
+| NFR-003 | Maintainability | Cobertura del módulo ≥85% | `pytest --cov=tempify.io --cov-fail-under=85` |
+| NFR-004 | Usability | Mensajes de error en español, con código referenciable | Test `test_error_messages_spanish` |
 
 ## 6. Criterios de aceptación
 
-- [ ] Todos los REQ cubiertos por tests específicos
-- [ ] Cobertura del módulo >= 85%
+- [ ] REQ-001 cubierto por test `test_base_reader_protocol_signature`
+- [ ] REQ-002 cubierto por test `test_read_returns_dataarray_with_crs`
+- [ ] REQ-003 cubierto por test `test_provenance_metadata_present_in_output`
+- [ ] REQ-004 cubierto por test `test_netcdf_writer_cf_compliant_zlib_default`
+- [ ] REQ-005 cubierto por test `test_geotiff_collection_filename_template`
+- [ ] REQ-006 cubierto por test `test_writer_raises_file_exists_when_overwrite_false`
+- [ ] REQ-007 cubierto por test `test_netcdf_writer_includes_cf_attributes`
+- [ ] REQ-008 cubierto por test `test_crs_preserved_across_concat_and_write`
+- [ ] REQ-009 cubierto por test `test_zarr_writer_available_when_extra_installed`
+- [ ] REQ-010 cubierto por test `test_provenance_serialization_netcdf_and_sidecar_json`
+- [ ] NFR-001 cubierto por test `test_roundtrip_netcdf_preserves_attrs_and_values`
+- [ ] NFR-002 medido por benchmark `bench_read_geotiff_stack_12x3000x500` (<5s)
+- [ ] NFR-003 verificado por `pytest --cov=tempify.io --cov-fail-under=85`
+- [ ] NFR-004 cubierto por test `test_error_messages_spanish`
 - [ ] Documentación API completa (docstrings NumPy)
 - [ ] CHANGELOG actualizado
 
@@ -74,20 +104,28 @@ IF a target file exists and `overwrite=False`, THEN THE SYSTEM SHALL raise `File
 
 ### Specs relacionadas
 
-- Bloqueada por: [core-interpolation](../core-interpolation/requirements.md)
-- Bloquea: [cli](../cli/requirements.md) (transitivamente)
+- Bloqueada por: ninguna (I/O es Capa 1 base de la arquitectura).
+- Bloquea: [pipeline](../pipeline/requirements.md), [validation](../validation/requirements.md), [structure-detection](../structure-detection/requirements.md), [temporal-frequency-resolver](../temporal-frequency-resolver/requirements.md), [cli](../cli/requirements.md) (todas las consumen).
 
 ### Supuestos
 
 - Los inputs son archivos legibles por GDAL via rioxarray.
+- El hashing de inputs (MD5) sigue la política definida en [ADR-0007](../../docs/adr/0007-reproducibility-policy.md).
+- El payload de procedencia sigue el shape definido en [processing-report.schema](../../docs/schemas/processing-report.schema.md).
 
 ### Riesgos
 
 | Riesgo | Probabilidad | Impacto | Mitigación |
 |---|---|---|---|
-| Edge cases en formatos no estándar | Media | Bajo | Fixtures extensivas + manejo robusto de excepciones |
+| Pérdida de CRS en concat multi-archivo | Media | Alto | Tests roundtrip por formato y uso explícito de `rio.write_crs()` tras cada concat |
+| Encoding NetCDF: cast silencioso de `_FillValue` al dtype destino | Media | Medio | Test parametrizado por dtype (`float32`, `float64`, `int16`) validando `_FillValue` post-roundtrip |
+| Costo de MD5 sobre archivos multi-GB | Alta | Medio | Streaming hash con chunks de 64KB; medir overhead en benchmark dedicado |
+| Dependencia opcional Zarr no instalada | Media | Bajo | Import lazy en `ZarrWriter`; al instanciar sin la dep, lanzar `MissingOptionalDependencyError` con mensaje accionable |
+| GeoTIFF multi-banda con >65535 bandas | Baja | Medio | Validar `count` en reader y lanzar `UnsupportedBandCountError` antes de cargar |
 
 ## 8. Referencias
 
 - CF Conventions: https://cfconventions.org/
 - EARS notation: https://alistairmavin.com/ears/
+- ADR-0007: [Política de reproducibilidad](../../docs/adr/0007-reproducibility-policy.md)
+- Schema: [processing-report.schema](../../docs/schemas/processing-report.schema.md)

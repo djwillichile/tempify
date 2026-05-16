@@ -49,7 +49,7 @@ THE SYSTEM SHALL provide a Windows installer `.exe` that is self-contained for W
 
 ### REQ-002
 
-WHEN the CI workflow runs on a tag matching `v*`, THE SYSTEM SHALL build the PyInstaller bundle, generate the Inno Setup `.exe` and attach it as a release asset to the corresponding GitHub Release.
+WHEN the CI workflow runs on a tag matching `v*`, THE SYSTEM SHALL build the PyInstaller bundle, generate the Inno Setup `.exe` and attach it as a release asset to the corresponding GitHub Release, using runner image `windows-2022` (explicitly pinned, not `windows-latest`).
 
 ### REQ-003
 
@@ -61,7 +61,7 @@ WHEN the user runs the installer, THE SYSTEM SHALL present the Inno Setup wizard
 
 ### REQ-005
 
-WHEN the installation finishes, THE SYSTEM SHALL create a Start Menu shortcut named "tempify" that launches the GUI as the default entry point, and an optional Desktop shortcut.
+WHEN the installation finishes, THE SYSTEM SHALL create a Start Menu shortcut named "tempify" that launches the GUI as the default entry point, and an optional Desktop shortcut. EL instalador Inno Setup propone por default modo per-machine (requiere admin para VC++ runtime auto-install per REQ-007), con opción per-user que omite la instalación de VC++ (si falta, la GUI dará error claro al arrancar).
 
 ### REQ-006
 
@@ -81,7 +81,23 @@ WHEN the installer detects an existing tempify installation, THE SYSTEM SHALL pr
 
 ### REQ-010
 
-THE SYSTEM SHALL keep the `pip install tempify` developer distribution functional and unaffected by the packaging artifacts.
+THE SYSTEM SHALL keep the `pip install tempify` developer distribution functional and unaffected by the packaging artifacts. Criterio de aceptación: test de matriz CI corre `pip install tempify` en un venv limpio y luego ejecuta `tempify --version` en máquina con el instalador `.exe` previamente instalado, asegurando que ambos coexisten sin conflicto de PATH (el `.exe` instala su shortcut en menú inicio, el pip expone `tempify` en venv activado).
+
+### REQ-011
+
+THE SYSTEM SHALL declare `pyinstaller>=6.3` and `pyside6>=6.6` in the optional extra `[packaging]` in `pyproject.toml`. The Inno Setup version required is `>=6.2`, declared in the CI workflow as a chocolatey/winget install.
+
+### REQ-012
+
+WHEN the build workflow runs, THE SYSTEM SHALL fail early if `tempify[gui]` extras are not installed in the build environment, with a clear error indicating the missing dependency.
+
+### REQ-013
+
+THE SYSTEM SHALL guarantee reproducibilidad de build: dos builds consecutivos del mismo tag con el mismo runner pineado (`windows-2022`) producen instaladores con SHA256 idéntico ignorando timestamp embebido. Test: workflow CI ejecuta `build → sha256 → rerun → sha256 → assert equal`.
+
+### REQ-014
+
+WHEN the CI publishes a release, THE SYSTEM SHALL upload a `SHA256SUMS.txt` file alongside the `.exe` with checksums of all release artifacts; este archivo compensa la ausencia de firma digital en v0.1.0.
 
 ## 5. Requisitos no funcionales
 
@@ -89,26 +105,30 @@ THE SYSTEM SHALL keep the `pip install tempify` developer distribution functiona
 |---|---|---|---|
 | NFR-001 | Performance | Cold start de la GUI desde el ejecutable instalado | < 5 s en máquina típica (Windows 11, SSD, 16 GB RAM) medido por smoke test |
 | NFR-002 | Memory/Footprint | Tamaño del instalador `.exe` final | < 300 MB; reportado por job CI |
-| NFR-003 | Reliability | Smoke test verde en GitHub Actions `windows-latest` | Instala, abre GUI, procesa fixture, desinstala sin errores |
+| NFR-003 | Reliability | Smoke test verde en GitHub Actions `windows-2022` | Instala, abre GUI, procesa fixture, desinstala sin errores |
 | NFR-004 | Portability | Soporte de plataforma | Windows 10 build 19041 mínimo y Windows 11 22H2; documentado en README |
-| NFR-005 | Maintainability | Reproducibilidad del build | `pyinstaller.spec` e `installer.iss` versionados; build reproducible desde el repo |
+| NFR-005 | Maintainability | Versionado de scripts de build | `pyinstaller.spec` e `installer.iss` versionados en el repo (la reproducibilidad bit-exact se especifica en REQ-013) |
 | NFR-006 | Coverage | Cobertura del módulo `tempify.packaging` (si aplica código Python auxiliar) | >= 85% reportado por `pytest --cov` |
 
 ## 6. Criterios de aceptación
 
 - [ ] REQ-001 cubierto por test `test_installer_runs_without_python` (VM Windows limpia en CI).
-- [ ] REQ-002 cubierto por verificación del workflow `build-windows.yml` sobre un tag de prueba.
+- [ ] REQ-002 cubierto por verificación del workflow `build-windows.yml` sobre un tag de prueba con runner `windows-2022`.
 - [ ] REQ-003 cubierto por test `test_bundle_contains_gdal_proj_qt`.
 - [ ] REQ-004 cubierto por inspección visual del wizard y test `test_installer_locale_es`.
-- [ ] REQ-005 cubierto por test `test_start_menu_shortcut_created`.
+- [ ] REQ-005 cubierto por test `test_start_menu_shortcut_created` y `test_per_user_vs_per_machine_modes`.
 - [ ] REQ-006 cubierto por test `test_file_association_optional`.
 - [ ] REQ-007 cubierto por test `test_vcruntime_installed`.
 - [ ] REQ-008 cubierto por test `test_uninstall_preserves_user_outputs`.
 - [ ] REQ-009 cubierto por test `test_upgrade_preserves_config`.
-- [ ] REQ-010 cubierto por test `test_pip_install_still_works`.
+- [ ] REQ-010 cubierto por test `test_pip_install_still_works` y `test_pip_exe_coexistence`.
+- [ ] REQ-011 cubierto por inspección de `pyproject.toml` y job CI que valida versiones mínimas de PyInstaller, PySide6, Inno Setup.
+- [ ] REQ-012 cubierto por test `test_build_fails_without_gui_extras`.
+- [ ] REQ-013 cubierto por job CI `test_build_reproducibility_sha256`.
+- [ ] REQ-014 cubierto por job CI que sube `SHA256SUMS.txt` como asset de release.
 - [ ] NFR-001 medido y dentro del umbral (< 5 s) por smoke test.
 - [ ] NFR-002 medido y reportado (< 300 MB).
-- [ ] NFR-003 smoke test verde en `windows-latest`.
+- [ ] NFR-003 smoke test verde en `windows-2022`.
 - [ ] NFR-006 cobertura medida si hay módulo auxiliar Python.
 - [ ] Documentación de packaging actualizada en `docs/`.
 - [ ] CHANGELOG actualizado.
@@ -124,21 +144,26 @@ THE SYSTEM SHALL keep the `pip install tempify` developer distribution functiona
 
 ### Supuestos
 
-- GitHub Actions con runner `windows-latest` está disponible y permanece compatible con PyInstaller >= 6.3.
-- Inno Setup 6.x se instala en el runner mediante `chocolatey` o una action equivalente (ej. `inno-setup-action`).
+- GitHub Actions con runner `windows-2022` (pineado) está disponible y permanece compatible con PyInstaller >= 6.3 (per REQ-011).
+- Inno Setup >= 6.2 se instala en el runner mediante `chocolatey` o `winget` (per REQ-011).
 - Las wheels de `rasterio` y `pyproj` distribuidas en PyPI incluyen GDAL/PROJ binarios; no se requiere GDAL nativo en el sistema destino.
-- El equipo del autor no dispone de certificado de code-signing en la línea de tiempo de v0.1.0.
-- El usuario final tiene permisos administrativos para instalar el `.exe` (modo por defecto) o usa el modo single-user si se ofrece.
+- El equipo del autor no dispone de certificado de code-signing en la línea de tiempo de v0.1.0; se compensa con `SHA256SUMS.txt` (per REQ-014).
+- El usuario final tiene permisos administrativos para el modo per-machine (default) o usa el modo per-user opcional (per REQ-005).
+- Decisión técnica documentada en `docs/adr/0006-pyinstaller-inno-setup-packaging.md`.
 
 ### Riesgos
 
 | Riesgo | Probabilidad | Impacto | Mitigación |
 |---|---|---|---|
 | PyInstaller no detecta automáticamente recursos de `rasterio`, `pyproj` o `netcdf4` | Alta | Alto | Hooks explícitos en `packaging/pyinstaller.spec`, smoke test post-build que valida importación y operación |
-| El bundle excede 300 MB por dependencias de PySide6 y `scipy` | Media | Medio | Listas de `--exclude-module` para submódulos no usados, recorte de Qt plugins innecesarios, revisión periódica de tamaño |
+| El bundle excede 300 MB por dependencias de PySide6 y `scipy` | Media | Medio | Listas de `--exclude-module` para submódulos no usados, recorte de Qt plugins innecesarios, revisión periódica de tamaño; NFR-002 con margen y tests reales |
 | SmartScreen marca el instalador no firmado como riesgoso | Alta | Medio | Documentar workaround temporal en README ("Más información" → "Ejecutar de todas formas"), priorizar code-signing para v0.2.0 |
+| Antivirus heurístico marca falsos positivos sobre el `.exe` PyInstaller | Media | Medio | `SHA256SUMS.txt` publicado (REQ-014) + documentación de verificación de integridad en README |
+| Conflicto PATH entre instalación pip y `.exe` | Media | Medio | Test de coexistencia pip vs `.exe` definido en REQ-010 |
+| Asociaciones `.nc`/`.tif` sobrescriben las del usuario (ej. QGIS) | Alta | Medio | Prompt opt-in durante instalación (REQ-006), nunca aplicado por default |
+| Recursos PROJ data del bundle divergentes vs QGIS u otros GIS instalados | Media | Bajo | Documentar warning informativo en README sobre versiones PROJ embebidas |
 | Wheels de `rasterio`/`pyproj` cambian de layout y rompen el spec | Media | Alto | Pinear versiones en `pyproject.toml`, smoke test en CI que detecta regresiones |
-| GitHub Actions `windows-latest` cambia su imagen base | Baja | Medio | Pinear versión específica del runner en el workflow cuando sea posible |
+| GitHub Actions cambia imagen base | Baja | Medio | Runner pineado a `windows-2022` (REQ-002), no `windows-latest` |
 
 ## 8. Referencias
 
@@ -147,4 +172,4 @@ THE SYSTEM SHALL keep the `pip install tempify` developer distribution functiona
 - Rasterio packaging guide: https://rasterio.readthedocs.io/en/stable/installation.html
 - Microsoft SmartScreen: https://learn.microsoft.com/en-us/windows/security/operating-system-security/virus-and-threat-protection/microsoft-defender-smartscreen/
 - Steering: `../../steering/product.md`, `../../steering/tech.md`
-- ADR pendiente: ADR-0006 (selección PyInstaller + Inno Setup)
+- ADR: `../../docs/adr/0006-pyinstaller-inno-setup-packaging.md`

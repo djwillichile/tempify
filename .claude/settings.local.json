@@ -7,7 +7,11 @@
       "Bash(git init *)",
       "Bash(git config *)",
       "Bash(git add *)",
-      "Bash(git commit -m 'chore: inicializar repositorio con harness SDD y borradores de specs *)"
+      "Bash(git commit -m 'chore: inicializar repositorio con harness SDD y borradores de specs *)",
+      "PowerShell($env:Path = [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"Machine\"\\) + \";\" + [System.Environment]::GetEnvironmentVariable\\(\"Path\",\"User\"\\); & 'C:\\\\Program Files\\\\GitHub CLI\\\\gh.exe' repo create djwillichile/tempify --private --source=\"D:\\\\proyectos IA\\\\tempify\" --remote=origin --push --description=\"Temporal densification for geospatial raster stacks \\(monthly to daily\\) with mean-preserving interpolation methods.\" 2>&1 | Select-Object -Last 10)",
+      "Bash(git checkout *)",
+      "Bash(git commit -m 'specs: cerrar Sub-fase 1.C — auditoría, ADRs, schemas y enmiendas *)",
+      "Bash(git push *)"
     ]
   }
 }

@@ -4,10 +4,11 @@
 **Owner:** Guillermo Fuentes-Jaque
 **Fecha creación:** 2026-05-16
 **Última actualización:** 2026-05-16
+**Enmiendas aplicadas:** 2026-05-16 (audit `specs/_audit/2026-05-16-requirements-audit.md`)
 
 ## 1. Propósito
 
-Proveer una interfaz gráfica de escritorio en español que permita a usuarios sin conocimientos de Python invocar las conversiones de densificación temporal del pipeline de tempify mediante drag&drop, selección visual del método de interpolación y visualización del reporte. La GUI es una capa cliente equivalente al CLI: NO contiene lógica de negocio y delega toda operación en `tempify.pipeline.tempifyPipeline.run()`.
+Proveer una interfaz gráfica de escritorio en español que permita a usuarios sin conocimientos de Python invocar las conversiones de densificación temporal del pipeline de tempify mediante drag&drop, selección visual del método de interpolación y visualización del reporte. La GUI es una capa cliente equivalente al CLI: NO contiene lógica de negocio y delega toda operación en `tempify.pipeline.TempifyPipeline.run()`.
 
 ## 2. Alcance
 
@@ -47,7 +48,7 @@ Proveer una interfaz gráfica de escritorio en español que permita a usuarios s
 
 > Como técnico que prepara inputs climáticos para un EIA, quiero validar un archivo NetCDF antes de procesarlo y obtener un reporte que pueda anexar a documentación oficial.
 
-**Caso de uso típico:** El técnico abre la GUI, selecciona la pestaña "Validar", arrastra un NetCDF, la GUI invoca `tempifyPipeline` en modo `validate`. Si la validación falla, aparece un diálogo modal con el código de error (ej: `GEO-003`) y la descripción en español. Si pasa, el reporte se muestra en el visor y se ofrece la opción "Guardar reporte como…".
+**Caso de uso típico:** El técnico abre la GUI, selecciona la pestaña "Validar", arrastra un NetCDF, la GUI invoca `TempifyPipeline` en modo `validate`. Si la validación falla, aparece un diálogo modal con el código de error (ej: `GEO-003`) y la descripción en español. Si pasa, el reporte se muestra en el visor y se ofrece la opción "Guardar reporte como…".
 
 ## 4. Requisitos funcionales (formato EARS)
 
@@ -57,7 +58,7 @@ THE SYSTEM SHALL expose three primary operations equivalent to the CLI subcomman
 
 ### REQ-002 (Ubiquitous)
 
-THE SYSTEM SHALL invoke business logic exclusively through `tempify.pipeline.tempifyPipeline.run()` and SHALL NOT duplicate or reimplement detection, validation, interpolation, or I/O logic.
+THE SYSTEM SHALL invoke business logic exclusively through `tempify.pipeline.TempifyPipeline.run()` and SHALL NOT duplicate or reimplement detection, validation, interpolation, or I/O logic.
 
 ### REQ-003 (Event-driven)
 
@@ -103,15 +104,27 @@ IF the GUI is launched in an environment without a graphical display (no `DISPLA
 
 WHERE the user enables the "Modo experto" toggle in the settings dialog, THE SYSTEM SHALL display additional parameters (chunk size, número de armónicos de Fourier, iteraciones de Rymes-Myers) that are normally hidden behind defaults.
 
+### REQ-014 (Ubiquitous)
+
+THE SYSTEM SHALL use `QTextBrowser` (built-in) as the Markdown renderer for the `ReportViewer`, NOT `QWebEngineView`. Justification: `QWebEngineView` adds ~80 MB to the PyInstaller bundle and triggers Chromium sandbox issues on packaged Windows. Trade-off: complex Markdown (mermaid, syntax highlighting) renders simpler. Whether to expose a fallback `QWebEngineView` mode behind a feature flag is deferred to `design.md`.
+
+### REQ-015 (Event-driven)
+
+WHEN the detected variable profile is `precipitation`, THE SYSTEM SHALL disable smooth methods (`linear`, `pchip`, `pchip_mp`, `fourier`) in the method selector dropdown and display a tooltip in Spanish citing ADR-0004 (`docs/adr/0004-precipitation-policy.md`); the user MAY force a smooth method only by enabling a hidden "Modo experto" checkbox that triggers the typed-confirmation dialog defined by the pipeline contract.
+
+### REQ-016 (Ubiquitous)
+
+THE SYSTEM SHALL execute the pipeline in a worker via `QThread` (subclass pattern) using `Qt.QueuedConnection` for cross-thread signal/slot calls. `QRunnable` + `QThreadPool` is deferred to v0.2 if parallelism across multiple conversions is required. The decision is recorded in this spec's `design.md`.
+
 ## 5. Requisitos no funcionales
 
 | ID | Categoría | Requisito | Criterio verificable |
 |---|---|---|---|
 | NFR-001 | Usability | Toda la interfaz por defecto en español validado por inspección automática | Test `test_gui_all_strings_spanish` verifica que no haya strings inglesas en widgets visibles |
-| NFR-002 | Performance | La UI nunca bloquea: el pipeline corre en `QThread`/`QRunnable` separado del hilo de UI | Test `test_gui_ui_responsive_during_processing` mide latencia de respuesta a eventos < 100 ms mientras un job dummy procesa |
+| NFR-002 | Performance | La UI nunca bloquea: el pipeline corre en un `QThread` worker (REQ-016) separado del hilo de UI | Test `test_gui_ui_responsive_during_processing` mide latencia de respuesta a eventos < 100 ms mientras un job dummy procesa |
 | NFR-003 | Reliability | La cancelación nunca deja outputs corruptos: escritura a archivos temporales con rename atómico al final | Test `test_gui_cancel_no_partial_output` confirma que tras cancelar no quedan archivos en el directorio de salida |
-| NFR-004 | Portability | Soporte primario Windows 10/11; soporte best-effort Linux (X11/Wayland) y macOS | CI ejecuta tests en Windows obligatorio, Linux como job adicional |
-| NFR-005 | Maintainability | Cobertura del módulo `tempify.gui` >= 70% con `pytest-qt` | Reporte de cobertura en CI |
+| NFR-004 | Portability | v0.1.0 garantiza Windows 10/11 como plataforma soportada. Linux (X11/Wayland) y macOS pueden funcionar pero NO entran en el CI gating ni en el release v0.1.0; se aceptan PRs de soporte pero no se garantiza estabilidad | CI obligatorio en Windows; jobs Linux/macOS son informativos y no bloquean release |
+| NFR-005 | Maintainability | Cobertura del módulo `tempify.gui` >= 70% con `pytest-qt`. Esto constituye una excepción documentada al guardrail global de 85% (`steering/conventions.md` regla nº1) justificada por la naturaleza event-driven y dependiente de display de PySide6 (cubrir 100% requeriría mocks frágiles de eventos Qt). Excepción validada en ADR-0005 | Reporte de cobertura en CI; excepción referenciada en `docs/adr/0005-pyside6-as-gui-framework.md` |
 | NFR-006 | Accessibility | Atajos de teclado funcionales y todos los widgets interactivos alcanzables vía `Tab` | Test `test_gui_keyboard_navigation` recorre el orden de tabulación |
 | NFR-007 | Usability | Mensajes de error muestran código referenciable y descripción en español | Test `test_gui_error_dialog_format` |
 | NFR-008 | Maintainability | Strings de UI extraíbles vía `pyside6-lupdate` sin warnings | Hook pre-commit `check_i18n_strings.py` |
@@ -133,6 +146,9 @@ Lista verificable que define cuándo esta spec está completamente implementada:
 - [ ] REQ-011 cubierto por test `test_gui_keyboard_shortcuts`
 - [ ] REQ-012 cubierto por test `test_gui_no_display_raises_NoDisplayError`
 - [ ] REQ-013 cubierto por test `test_gui_expert_mode_reveals_advanced_params`
+- [ ] REQ-014 cubierto por test `test_gui_report_viewer_uses_qtextbrowser` (verifica que `QWebEngineView` no es importado en `tempify.gui`)
+- [ ] REQ-015 cubierto por test `test_gui_precipitation_disables_smooth_methods` (perfil `precipitation` deshabilita métodos suaves y muestra tooltip ADR-0004)
+- [ ] REQ-016 cubierto por test `test_gui_pipeline_runs_in_qthread_worker` (verifica subclass `QThread` y `Qt.QueuedConnection`)
 - [ ] NFR-002 medido por `test_gui_ui_responsive_during_processing`
 - [ ] NFR-005 cobertura `tempify.gui` >= 70% en reporte de CI
 - [ ] Smoke test de integración `test_gui_full_workflow_with_fixture` (drop carpeta fixture WorldClim sintética, método PCHIP+RM, output a `tmp_path`, verifica reporte y NetCDF generado)
@@ -143,17 +159,18 @@ Lista verificable que define cuándo esta spec está completamente implementada:
 
 ### Specs relacionadas
 
-- Bloqueada por: [pipeline](../pipeline/requirements.md) (depende del contrato de `tempifyPipeline.run()` y de su callback de progreso compatible con señales Qt).
+- Bloqueada por: [pipeline](../pipeline/requirements.md) (depende del contrato de `TempifyPipeline.run()` y de su callback de progreso compatible con señales Qt).
 - Bloqueada por: [cli](../cli/requirements.md) (paridad de operaciones, taxonomía de códigos de error, mensajería en español).
 - Bloquea: `packaging` (el empaquetado PyInstaller del ejecutable Windows requiere esta GUI como entry point).
 
 ### Supuestos
 
 - El entorno de ejecución dispone de un display gráfico (sesión Windows interactiva, X11/Wayland en Linux, Quartz en macOS).
-- `PySide6>=6.6` está instalado como dependencia opcional vía el extra `gui` en `pyproject.toml` (`pip install tempify[gui]`).
-- El callback de progreso del pipeline emite eventos estructurados (porcentaje, mensaje, fase) compatibles con ser envueltos en `Signal(int, str, str)` de Qt.
+- `PySide6>=6.6` es un **extra opcional** `tempify[gui]` en la instalación pip: usuarios que solo emplean la API Python o la CLI no lo necesitan. En cambio, el instalador Windows producido por la spec `packaging` SIEMPRE incluye PySide6 porque la GUI es su target principal. Ambos canales (pip y `.exe`) son distintos y esta dualidad no es contradictoria: el extra rige la dependencia declarada en `pyproject.toml`, el bundle PyInstaller la incrusta sí o sí.
+- El callback de progreso del pipeline (contrato definido en `specs/pipeline/requirements.md`) emite eventos estructurados (porcentaje, mensaje, fase) compatibles con ser envueltos en `Signal(int, str, str)` de Qt.
 - Las traducciones se versionan en `tempify/gui/i18n/tempify_es_CL.ts` con compilación a `.qm` en build.
-- El framework GUI es **PySide6** (decisión locked, ADR-0005 pendiente).
+- El framework GUI es **PySide6** (decisión locked en ADR-0005, `docs/adr/0005-pyside6-as-gui-framework.md`).
+- La clase del pipeline se denomina `TempifyPipeline` (CamelCase) conforme a ADR-0014 (`docs/adr/0014-tempifypipeline-naming-correction.md`).
 
 ### Riesgos
 

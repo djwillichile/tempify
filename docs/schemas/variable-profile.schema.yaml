@@ -1,0 +1,290 @@
+# ---------------------------------------------------------------------------
+# tempify -- Variable Profile JSON Schema (draft-07, expressed in YAML)
+#
+# Contract for files under `profiles/*.yaml` consumed by VariableProfileMatcher
+# (Capa 2, ver steering/architecture.md) and por MethodVariableCompatibilityChecker
+# (specs/validation/requirements.md).
+#
+# Decisiones relacionadas:
+#   - ADR-0004  (precipitation policy: allowed_methods: [] por defecto)
+#   - ADR-0010  (acceptable_mean_error: tolerancia de conservacion de media)
+#   - ADR-0009  (rangos fisicos como banda de validacion blanda)
+#
+# Este archivo describe el contrato; los perfiles concretos viven en
+# `profiles/<variable>.yaml` y deben validar contra este schema.
+# ---------------------------------------------------------------------------
+
+$schema: "http://json-schema.org/draft-07/schema#"
+$id: "https://tempify/schemas/variable-profile.schema.yaml"
+title: Variable Profile
+description: |
+  Perfil declarativo de una variable climatologica/ambiental para tempify.
+  Determina que metodos de interpolacion son aceptables, que rango fisico
+  es valido, que tolerancias se aplican en validacion post-interpolacion,
+  y como se reconoce la variable a partir de nombres y metadata CF.
+
+type: object
+
+required:
+  - name
+  - canonical_name
+  - units
+  - allowed_methods
+  - physical_range
+  - acceptable_mean_error
+
+additionalProperties: false
+
+properties:
+
+  # -----------------------------------------------------------------------
+  # Identidad
+  # -----------------------------------------------------------------------
+  name:
+    type: string
+    pattern: "^[a-z][a-z0-9_]*$"
+    minLength: 2
+    maxLength: 64
+    description: |
+      Nombre canonico interno de la variable (lowercase snake_case).
+      Es la clave usada para invocar al perfil desde la CLI y el log.
+      Ej: "temperature", "precipitation", "relative_humidity",
+      "solar_radiation", "wind_speed", "vapor_pressure".
+
+  canonical_name:
+    type: string
+    minLength: 2
+    description: |
+      CF standard_name si existe (preferido), si no, nombre comunmente
+      aceptado en la literatura. Permite matching contra metadata CF
+      embebida en NetCDF / Zarr.
+      Ej: "air_temperature", "precipitation_flux",
+          "relative_humidity", "surface_downwelling_shortwave_flux_in_air".
+
+  aliases:
+    type: array
+    uniqueItems: true
+    default: []
+    items:
+      type: string
+      minLength: 1
+    description: |
+      Nombres alternativos detectables por VariableProfileMatcher en
+      nombres de archivo, variables NetCDF, attrs CF o metadata STAC.
+      Comparacion case-insensitive. Ej: ["tavg","tmean","tas","tmp"]
+      para temperature.
+
+  description:
+    type: string
+    description: |
+      Descripcion legible para humanos. Se muestra en logs y reportes.
+
+  # -----------------------------------------------------------------------
+  # Unidades
+  # -----------------------------------------------------------------------
+  units:
+    type: string
+    minLength: 1
+    description: |
+      Unidad fisica conforme a UDUNITS-2 / CF-conventions.
+      Ej: "degC", "K", "kg m-2 s-1", "mm", "mm month-1", "%", "W m-2",
+          "m s-1", "hPa".
+
+  # -----------------------------------------------------------------------
+  # Politica de metodos (ADR-0004)
+  # -----------------------------------------------------------------------
+  allowed_methods:
+    type: array
+    uniqueItems: true
+    items:
+      type: string
+      enum: [linear, pchip, pchip_mp, fourier]
+    description: |
+      Lista blanca de metodos de interpolacion permitidos para esta
+      variable. Lista vacia significa "rechazo por defecto": ningun
+      metodo es aceptable sin override explicito de la CLI
+      (`--force-method`, ver ADR-0004 para el caso precipitacion).
+      Codigos:
+        - linear   : interpolacion lineal por tramos
+        - pchip    : Piecewise Cubic Hermite Interpolating Polynomial
+        - pchip_mp : PCHIP con preservacion de media mensual
+        - fourier  : reconstruccion armonica truncada
+
+  default_method:
+    type: string
+    enum: [linear, pchip, pchip_mp, fourier]
+    description: |
+      Metodo elegido cuando el usuario no especifica `--method`.
+      Si se declara, DEBE pertenecer a `allowed_methods` (validado
+      por VariableProfileMatcher al cargar). Si `allowed_methods`
+      esta vacio, `default_method` debe omitirse.
+
+  # -----------------------------------------------------------------------
+  # Rango fisico (ADR-0009)
+  # -----------------------------------------------------------------------
+  physical_range:
+    type: object
+    required: [min, max]
+    additionalProperties: false
+    properties:
+      min:
+        type: number
+        description: |
+          Minimo fisico esperado en `units`. Valores por debajo se
+          reportan como warnings por PostInterpolationValidator.
+      max:
+        type: number
+        description: |
+          Maximo fisico esperado en `units`. Valores por encima se
+          reportan como warnings.
+      strict:
+        type: boolean
+        default: false
+        description: |
+          Si true, valores fuera de rango son ERROR en vez de warning
+          y abortan la pipeline (ver ADR-0009).
+    description: |
+      Banda fisica blanda usada por PostInterpolationValidator para
+      detectar artefactos del interpolador (overshoot tipico de
+      cubicas, oscilaciones de Gibbs en Fourier).
+
+  # -----------------------------------------------------------------------
+  # Tolerancias de validacion (ADR-0010)
+  # -----------------------------------------------------------------------
+  acceptable_mean_error:
+    type: number
+    exclusiveMinimum: 0
+    description: |
+      Tolerancia absoluta en `units` para conservacion de media mensual
+      (sumamos los valores diarios del mes interpolado, dividimos por
+      dias_del_mes, comparamos contra el valor mensual original).
+      Usada por PostInterpolationValidator en nivel 3 (ADR-0010).
+      Ej: 1.0e-4 degC para temperatura, 0.1 mm para precipitacion.
+
+  acceptable_relative_error:
+    type: number
+    exclusiveMinimum: 0
+    description: |
+      Tolerancia relativa adicional para conservacion de media
+      (fraccion del valor mensual). Opcional, complementa
+      `acceptable_mean_error`. Util para variables con rangos
+      dinamicos muy amplios. Ver ADR-0010 nivel 3.
+
+  monotonicity:
+    type: string
+    enum: [none, non_negative, non_positive]
+    default: none
+    description: |
+      Restriccion de signo en la serie diaria. `non_negative` impide
+      valores negativos (relevante para precipitacion, radiacion,
+      humedad). Activada, PostInterpolationValidator rechaza salidas
+      con violaciones.
+
+  # -----------------------------------------------------------------------
+  # Hints de performance
+  # -----------------------------------------------------------------------
+  default_chunk_size:
+    type: integer
+    minimum: 64
+    description: |
+      Tamano de chunk Dask recomendado (lado del bloque espacial) para
+      esta variable. Heuristica del autor del perfil basada en RAM
+      tipica y costo por celda del metodo. Opcional, override por CLI.
+
+  # -----------------------------------------------------------------------
+  # Procedencia
+  # -----------------------------------------------------------------------
+  references:
+    type: array
+    items:
+      type: string
+    description: |
+      Citaciones, DOIs o URLs que respaldan los valores declarados
+      (rangos fisicos, tolerancias, decision de metodos).
+
+  version:
+    type: string
+    pattern: "^\\d+\\.\\d+\\.\\d+$"
+    description: |
+      SemVer del perfil. Cambios incompatibles (e.g., reducir
+      `allowed_methods`) requieren bump mayor.
+
+# ---------------------------------------------------------------------------
+# Ejemplos validos
+# ---------------------------------------------------------------------------
+examples:
+
+  # Caso permisivo: todos los metodos son aceptables.
+  - name: temperature
+    canonical_name: air_temperature
+    aliases: [tavg, tmean, tas, tmp, t2m]
+    units: degC
+    allowed_methods: [linear, pchip, pchip_mp, fourier]
+    default_method: pchip_mp
+    physical_range:
+      min: -90.0
+      max: 60.0
+      strict: false
+    acceptable_mean_error: 1.0e-4
+    monotonicity: none
+    default_chunk_size: 512
+    description: "Temperatura del aire a 2m sobre superficie."
+    version: "1.0.0"
+
+  # Caso restrictivo: ADR-0004 prohibe interpolacion suave de precipitacion.
+  - name: precipitation
+    canonical_name: precipitation_flux
+    aliases: [prcp, pr, ppt, precip]
+    units: mm
+    allowed_methods: []      # rechazo por defecto, ver ADR-0004
+    physical_range:
+      min: 0.0
+      max: 2000.0
+      strict: true
+    acceptable_mean_error: 0.1
+    acceptable_relative_error: 0.01
+    monotonicity: non_negative
+    default_chunk_size: 256
+    description: |
+      Precipitacion mensual acumulada. Metodos suaves rechazados por
+      defecto (intermitencia, no negatividad, asimetria). Override
+      via `--force-method` bajo responsabilidad del usuario.
+    references:
+      - "ADR-0004-precipitation-policy"
+    version: "1.0.0"
+
+  # Caso acotado: humedad relativa restringe a [0,100].
+  - name: relative_humidity
+    canonical_name: relative_humidity
+    aliases: [rh, hurs]
+    units: "%"
+    allowed_methods: [linear, pchip, pchip_mp]
+    default_method: pchip_mp
+    physical_range:
+      min: 0.0
+      max: 100.0
+      strict: true
+    acceptable_mean_error: 0.05
+    monotonicity: non_negative
+    default_chunk_size: 512
+    description: "Humedad relativa a 2m, fraccion porcentual."
+    version: "1.0.0"
+
+  # Caso periodico: radiacion solar favorece Fourier por estacionalidad fuerte.
+  - name: solar_radiation
+    canonical_name: surface_downwelling_shortwave_flux_in_air
+    aliases: [srad, rsds, ssrd]
+    units: "W m-2"
+    allowed_methods: [pchip_mp, fourier]
+    default_method: fourier
+    physical_range:
+      min: 0.0
+      max: 500.0
+      strict: false
+    acceptable_mean_error: 0.5
+    monotonicity: non_negative
+    default_chunk_size: 512
+    description: |
+      Irradiancia solar media en superficie. Fuertemente periodica
+      anualmente, Fourier preserva mejor el ciclo diurno-estacional.
+    version: "1.0.0"
