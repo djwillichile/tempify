@@ -30,6 +30,7 @@ class _Dummy(BaseInterpolator):
         target_axis: TemporalAxis,
         *,
         cyclic: bool = True,
+        wraparound: bool | None = None,
         nan_policy: NanPolicy = "raise",
         chunk_size: int | None = None,
     ) -> xr.DataArray:
@@ -37,7 +38,8 @@ class _Dummy(BaseInterpolator):
         self._validate_month_contiguity(source)
         self._validate_calendar(target_axis)
         self._validate_nan_policy(nan_policy)
-        return self._postprocess(source, target_axis)
+        wrap = self._resolve_wraparound(cyclic, wraparound)
+        return self._postprocess(source, target_axis, wraparound=wrap)
 
 
 def _make_monthly(values: np.ndarray, months: list[int] | None = None) -> xr.DataArray:

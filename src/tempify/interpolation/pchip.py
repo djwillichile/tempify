@@ -37,6 +37,7 @@ class PchipInterpolator(BaseInterpolator):
     """
 
     name: ClassVar[str] = "pchip"
+    wraparound_stamp_on: ClassVar[str] = "climatological_4pt"
 
     def interpolate(
         self,
@@ -44,6 +45,7 @@ class PchipInterpolator(BaseInterpolator):
         target_axis: TemporalAxis,
         *,
         cyclic: bool = True,
+        wraparound: bool | None = None,
         nan_policy: NanPolicy = "raise",
         chunk_size: int | None = None,
     ) -> xr.DataArray:
@@ -52,6 +54,7 @@ class PchipInterpolator(BaseInterpolator):
         self._validate_month_contiguity(source)
         self._validate_calendar(target_axis)
         self._validate_nan_policy(nan_policy)
+        wrap = self._resolve_wraparound(cyclic, wraparound)
 
         x_in = np.asarray(target_axis.monthly_anchor_doys(), dtype=np.float64)
         x_out = np.arange(1, target_axis.n_days + 1, dtype=np.float64)
@@ -67,7 +70,7 @@ class PchipInterpolator(BaseInterpolator):
             kwargs={
                 "x_in": x_in,
                 "x_out": x_out,
-                "cyclic": cyclic,
+                "cyclic": wrap,
                 "nan_policy": nan_policy,
             },
             dask="parallelized",
@@ -76,7 +79,7 @@ class PchipInterpolator(BaseInterpolator):
             vectorize=False,
         )
         result = result.assign_coords(time=target_axis.to_datetime_index())
-        return self._postprocess(result, target_axis)
+        return self._postprocess(result, target_axis, wraparound=wrap)
 
     @staticmethod
     def _prepare_chunks(source: xr.DataArray, chunk: int) -> xr.DataArray:
