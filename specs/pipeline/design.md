@@ -134,6 +134,10 @@ class PipelineConfig:
     variable_profile_override: str | None = None
     seed: int = 42
     method_options: Mapping[str, Any] = field(default_factory=dict)
+    # Modo inspect: salta pre-validation (y por tanto compatibilidad de método/variable y coherencia geo).
+    # Solo aplica cuando dry_run=True. Pensado para `tempify inspect` que necesita
+    # DetectionResult sin invocar la capa Validation.
+    skip_pre_validation: bool = False
 ```
 
 **Invariantes verificadas en `__post_init__`:**
@@ -141,6 +145,7 @@ class PipelineConfig:
 - Si `reproducibility_mode == "strict"`, `scheduler` se fuerza a `"synchronous"` (warning si el usuario pasó `"threaded"` explícito).
 - `progress_frequency_hz > 0`.
 - `method_options` se congela mediante `MappingProxyType` para preservar la inmutabilidad del dataclass.
+- `skip_pre_validation=True` requiere `dry_run=True`; caso contrario, `__post_init__` levanta `InvalidConfigError`. Cuando este flag está activo, el `ProcessingReport` resultante omite la sección "Validación pre" (los campos `validation_pre` quedan como lista vacía y el reporte Markdown no renderiza ese bloque).
 
 ### `PipelineResult`
 
@@ -301,27 +306,35 @@ def run(self, source: Path | list[Path]) -> PipelineResult:
 
         # 2. validate_geospatial
         cb("validate_geospatial", 0.0)
-        try:
-            geo_checks = GeospatialCoherenceValidator().validate(detection)
-        except GeospatialIncoherenceError as e:
-            raise PipelinePreValidationError(
-                _msg_es("PIPELINE_GEOSPATIAL_INCOHERENT", e),
-                error_code=e.error_code,
-            ) from e
-        cb("validate_geospatial", 1.0)
+        if not cfg.skip_pre_validation:
+            try:
+                geo_checks = GeospatialCoherenceValidator().validate(detection)
+            except GeospatialIncoherenceError as e:
+                raise PipelinePreValidationError(
+                    _msg_es("PIPELINE_GEOSPATIAL_INCOHERENT", e),
+                    error_code=e.error_code,
+                ) from e
+            cb("validate_geospatial", 1.0)
+        else:
+            geo_checks = []
+            cb("validate_geospatial", 1.0, message="omitida (inspect mode)")
 
         # 3. validate_compatibility
         cb("validate_compatibility", 0.0)
-        try:
-            compat_checks = MethodVariableCompatibilityChecker(
-                method=cfg.method, force=cfg.force_method
-            ).check(detection.variable_profile)
-        except MethodVariableIncompatibilityError as e:
-            raise PipelinePreValidationError(
-                _msg_es("PIPELINE_METHOD_VARIABLE_INCOMPATIBLE", e),
-                error_code=e.error_code,
-            ) from e
-        cb("validate_compatibility", 1.0)
+        if not cfg.skip_pre_validation:
+            try:
+                compat_checks = MethodVariableCompatibilityChecker(
+                    method=cfg.method, force=cfg.force_method
+                ).check(detection.variable_profile)
+            except MethodVariableIncompatibilityError as e:
+                raise PipelinePreValidationError(
+                    _msg_es("PIPELINE_METHOD_VARIABLE_INCOMPATIBLE", e),
+                    error_code=e.error_code,
+                ) from e
+            cb("validate_compatibility", 1.0)
+        else:
+            compat_checks = []
+            cb("validate_compatibility", 1.0, message="omitida (inspect mode)")
 
         # Statistics pre (computadas lazy)
         stats_pre = StatisticalReporter().describe(detection.dataarray)
@@ -466,6 +479,10 @@ Preserva el traceback original y el `error_code` de la capa inferior (REQ-009). 
 
 Per ADR-0007. El campo `timestamp_utc` se inyecta al final de `build()`, después de congelar los hashes; tests de reproducibilidad comparan MD5 ignorando ese campo.
 
+### Decisión 7: Modo combinado `dry_run=True` + `skip_pre_validation=True` para `tempify inspect`
+
+El subcomando CLI `tempify inspect` (ver `specs/cli/design.md` § "Algoritmo `inspect`") necesita exponer únicamente el `DetectionResult` sin invocar la capa Validation. Para evitar que el CLI importe `tempify.detection` directamente (lo cual violaría su REQ-012 de aislamiento de imports), el pipeline ofrece el modo combinado `dry_run=True, skip_pre_validation=True`. Bajo este modo, `run()` ejecuta solo `detect` + `generate_report` con `validation_pre=[]` y outputs vacíos. Cualquier otra combinación (`skip_pre_validation=True` con `dry_run=False`) está prohibida por la invariante declarada en Contratos y se rechaza en `__post_init__`. Esto extiende REQ-011 sin alterar el comportamiento por defecto (`skip_pre_validation=False`).
+
 ## 7. Estrategia de testing
 
 ### Tests unitarios y de integración (uno por REQ)
@@ -487,9 +504,18 @@ Per ADR-0007. El campo `timestamp_utc` se inyecta al final de `build()`, despué
 | `test_pipeline_error_hierarchy_and_codes` | REQ-009 |
 | `test_pipeline_error_messages_spanish` | REQ-009, NFR-006 |
 | `test_pipeline_bit_exact_reproducibility` (strict mode) | REQ-010, NFR-002 |
+| `test_pipeline_allclose_reproducibility_parallel` (parallel mode, scheduler `threaded`) | NFR-002, ADR-0007 |
 | `test_pipeline_dry_run_skips_interpolation_and_write` | REQ-011 |
+| `test_pipeline_inspect_mode_skips_pre_validation` | REQ-011 (ampliado) |
+| `test_pipeline_skip_pre_validation_without_dry_run_raises` | REQ-011 (ampliado) |
 | `test_pipeline_invokes_frequency_resolver_callback` | REQ-012 |
 | `test_pipeline_raises_when_callback_returns_none` | REQ-012 |
+
+Especificación de los tres tests añadidos:
+
+- `test_pipeline_allclose_reproducibility_parallel`: construye `PipelineConfig(reproducibility_mode="parallel", scheduler="threaded", ...)` y ejecuta `run()` dos veces sobre el mismo `source`. Verifica `xr.testing.assert_allclose(out1, out2, rtol=1e-12, atol=1e-15)` sobre los `DataArray` resultantes (leídos desde los outputs escritos). Cubre la promesa de ADR-0007 para el modo `parallel`, complementaria al bit-exact del modo `strict`.
+- `test_pipeline_inspect_mode_skips_pre_validation`: ejecuta `run()` con `PipelineConfig(dry_run=True, skip_pre_validation=True, ...)` sobre un fixture cuyos archivos tienen CRS deliberadamente inconsistente. Verifica que el `PipelineResult.report.validation_pre` está vacío, que no se levanta `PipelinePreValidationError`, y que el `result.detection` está completamente poblado. Cubre el contrato consumido por el subcomando CLI `tempify inspect`.
+- `test_pipeline_skip_pre_validation_without_dry_run_raises`: construye `PipelineConfig(skip_pre_validation=True, dry_run=False, ...)` y verifica que `__post_init__` levanta `InvalidConfigError` con `error_code="PIPELINE_INVALID_CONFIG_SKIP_REQUIRES_DRY_RUN"`. Cubre la invariante declarada en la sección Contratos.
 
 ### Tests de imports prohibidos
 
@@ -549,10 +575,10 @@ No aplica: módulo nuevo, sin código previo en producción.
 | REQ-008 | `TempifyPipeline.run` (no mutación) | `test_pipeline_does_not_mutate_input_dataarray`, `test_pipeline_preserves_lazy_evaluation` |
 | REQ-009 | `tempify.pipeline.errors.*` | `test_pipeline_error_hierarchy_and_codes`, `test_pipeline_error_messages_spanish` |
 | REQ-010 | `reproducibility_context` + `ReportGenerator` | `test_pipeline_bit_exact_reproducibility` |
-| REQ-011 | `TempifyPipeline._build_dry_run_result` | `test_pipeline_dry_run_skips_interpolation_and_write` |
+| REQ-011 | `TempifyPipeline._build_dry_run_result`, `PipelineConfig.skip_pre_validation` | `test_pipeline_dry_run_skips_interpolation_and_write`, `test_pipeline_inspect_mode_skips_pre_validation`, `test_pipeline_skip_pre_validation_without_dry_run_raises` |
 | REQ-012 | `TempifyPipeline._detect` + `FrequencyResolverProtocol` | `test_pipeline_invokes_frequency_resolver_callback`, `test_pipeline_raises_when_callback_returns_none` |
 | NFR-001 | Benchmark | `tests/benchmark/test_pipeline_overhead.py` |
-| NFR-002 | `reproducibility_context` | `test_pipeline_bit_exact_reproducibility` |
+| NFR-002 | `reproducibility_context` | `test_pipeline_bit_exact_reproducibility`, `test_pipeline_allclose_reproducibility_parallel` |
 | NFR-003 | `_make_throttled_hook` | `test_pipeline_progress_callback_frequency` |
 | NFR-004 | Preservación de pereza Dask | `test_pipeline_preserves_lazy_evaluation`, `test_pipeline_memory_peak` |
 | NFR-005 | Cobertura general | CI: `pytest --cov=tempify.pipeline --cov-fail-under=85` |

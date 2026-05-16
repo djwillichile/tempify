@@ -191,7 +191,7 @@ from dataclasses import dataclass
 from pathlib import Path
 
 from tempify.detection.types import RasterMetadata, StructureMode
-from tempify.detection.confidence import PartialConfidence
+from tempify.detection.confidence import StructureConfidencePartial
 
 
 @dataclass(frozen=True)
@@ -206,11 +206,12 @@ class StructureDetectionResult:
         Ordered list of resolved file paths. NFC lexicographic order
         except in mode C, where user-provided order is preserved.
     confidence
-        Partial DetectionConfidence with the keys this layer computes:
-        `structure_mode` and `homogeneity`. The remaining keys
-        (`temporal_frequency`, `temporal_frequency_tier`,
-        `variable_profile`, `overall`) are populated downstream by the
-        pipeline assembler.
+        Partial DetectionConfidence (`StructureConfidencePartial`) with
+        the keys this layer computes: `structure_mode` and
+        `homogeneity`. The remaining keys (`temporal_frequency`,
+        `temporal_frequency_tier`, `variable_profile`, `overall`) are
+        populated downstream by the pipeline assembler per ADR-0008
+        section "Composición por capas".
     evidence
         Dict[str, str] with short textual signals per component
         (matches docs/schemas/detection-result.schema.md rule 6).
@@ -220,23 +221,26 @@ class StructureDetectionResult:
     """
     structure_mode: StructureMode
     files: list[Path]
-    confidence: PartialConfidence       # TypedDict with structure_mode + homogeneity
+    confidence: StructureConfidencePartial  # TypedDict with structure_mode + homogeneity
     evidence: dict[str, str]
     metadata_index: dict[Path, RasterMetadata]
 ```
 
-### `PartialConfidence` (TypedDict)
+### `StructureConfidencePartial` (TypedDict)
 
 ```python
 from typing import TypedDict
 
 
-class PartialConfidence(TypedDict):
+class StructureConfidencePartial(TypedDict):
     """Subset of DetectionConfidence (ADR-0008) computed by Capa 2 Structure.
 
-    The full DetectionConfidence with the six canonical keys is
-    assembled by the pipeline after TemporalFrequencyResolver and
-    VariableProfileMatcher have run.
+    Naming follows the `<Capa>ConfidencePartial` convention defined in
+    ADR-0008 section "Composición por capas". The full
+    `DetectionConfidence` with the six canonical keys is assembled by
+    the pipeline after `TemporalFrequencyResolver` (which contributes
+    `FrequencyConfidencePartial`) and `VariableProfileMatcher` (which
+    contributes `VariableConfidencePartial`) have run.
     """
     structure_mode: float
     homogeneity: float
@@ -416,17 +420,15 @@ def _is_sidecar(p: Path) -> bool:
 **Razón:** la lista es contractual; un usuario que quiere otro filtro pre-filtra la lista y entra por modo C. Mantiene reproducibilidad alineada con ADR-0007.
 **Trade-offs:** menos flexibilidad; mitigado por modo C.
 
-### Decisión 4: PartialConfidence en lugar de DetectionConfidence completo
+### Decisión 4: StructureConfidencePartial en lugar de DetectionConfidence completo
 
 **Opciones consideradas:**
 1. Esta capa rellena las seis claves del `DetectionConfidence` con valores neutros para las que no le competen.
-2. Esta capa devuelve un `PartialConfidence` con las dos claves que realmente computa; el pipeline ensambla el `DetectionConfidence` completo.
+2. Esta capa devuelve un `StructureConfidencePartial` con las dos claves que realmente computa; el pipeline ensambla el `DetectionConfidence` completo.
 
-**Decisión:** opción 2.
-**Razón:** evita falsos positivos de confianza en componentes que esta capa no observa; mantiene separación de responsabilidades. El schema canónico se ensambla en un solo lugar (pipeline).
-**Trade-offs:** un mapping extra; documentado en el schema (subconjunto explícito).
-
-> No se registra ADR adicional: esta decisión no contradice ADR-0008, simplemente clarifica la frontera de responsabilidad entre Capa 2 sub-módulos y el ensamblador del pipeline.
+**Decisión:** opción 2, formalizada en ADR-0008 sección "Composición por capas".
+**Razón:** evita falsos positivos de confianza en componentes que esta capa no observa; mantiene separación de responsabilidades. El schema canónico se ensambla en un solo lugar (Pipeline, Capa 5), siguiendo el protocolo de subsets tipados `<Capa>ConfidencePartial` definido en el ADR. El contrato canónico del `DetectionConfidence` (seis claves obligatorias, rangos `[0.0, 1.0]`) se preserva intacto en la frontera Pipeline → consumidores.
+**Trade-offs:** un mapping extra en el ensamblador; documentado en el schema y en el ADR.
 
 ## 7. Estrategia de testing
 
@@ -456,7 +458,7 @@ Cobertura por tipo de detección (uno por mode/path):
 - `test_recursive_false_by_default` — REQ-011.
 - `test_recursive_skips_symlinks` — REQ-011.
 - `test_detection_result_shape` — REQ-006: forma del dataclass.
-- `test_confidence_dict_keys_canonical` — REQ-006: dos claves esperadas en `PartialConfidence`.
+- `test_confidence_dict_keys_canonical` — REQ-006: dos claves esperadas en `StructureConfidencePartial`.
 - `test_empty_folder_raises` — EmptyInputError.
 - `test_empty_list_raises` — EmptyInputError.
 
@@ -490,7 +492,7 @@ Cobertura por tipo de detección (uno por mode/path):
 No aplica: feature nueva, no hay usuarios actuales. Cuando aparezcan, el contrato se asegura por:
 - Re-export estable desde `tempify.detection`.
 - `StructureMode` heredando de `str`/`StrEnum` preserva compatibilidad estructural con el `Literal["A","B","C"]` que hoy declara `architecture.md`.
-- `PartialConfidence` es subconjunto exacto de `DetectionConfidence` (sin claves extra).
+- `StructureConfidencePartial` es subconjunto exacto de `DetectionConfidence` (sin claves extra), conforme a ADR-0008 sección "Composición por capas".
 
 ## 9. Métricas de calidad
 
@@ -512,7 +514,7 @@ No aplica: feature nueva, no hay usuarios actuales. Cuando aparezcan, el contrat
 | REQ-004 | `_classify` rama list + preservación de orden en `StructureDetectionResult.files` |
 | REQ-005 | `AmbiguousStructureError(AmbiguityReport)` en Algoritmo 2 |
 | REQ-005b | `disambiguation_callback` en constructor + paso 2 de Algoritmo 2 |
-| REQ-006 | `StructureDetectionResult` dataclass + `PartialConfidence` TypedDict |
+| REQ-006 | `StructureDetectionResult` dataclass + `StructureConfidencePartial` TypedDict |
 | REQ-007 | Delegación a `tempify.validation.geocoherence.is_homogeneous` con `CANONICAL_TOLERANCES` |
 | REQ-008 | Decisión 2 + modo C en Algoritmo 1, `confidence["structure_mode"] = 1.0` forzado |
 | REQ-009 | Algoritmo 3 (multi-banda GeoTIFF) + reducción de confidence cuando semántica incierta |

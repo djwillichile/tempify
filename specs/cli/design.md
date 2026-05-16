@@ -257,7 +257,7 @@ Render con `rich.Table` para `inputs`, `outputs`, `validation`. Errores capturad
 
 ### Algoritmo `inspect`
 
-Para no violar REQ-012, **no se importa `tempify.detection` directamente**. Se ejecuta el pipeline en `dry_run` con una bandera adicional en `PipelineConfig` (`skip_pre_validation=True`, ya disponible o solicitada como contrato menor al pipeline) que omite también pre-validation, dejando solo `detect → generate_report` con outputs vacíos. El CLI extrae `result.detection` del `PipelineResult` y lo renderiza.
+Para no violar REQ-012, **no se importa `tempify.detection` directamente**. El subcomando construye `PipelineConfig(dry_run=True, skip_pre_validation=True, ...)` y ejecuta el pipeline. El campo `skip_pre_validation` está formalmente declarado en `specs/pipeline/design.md` § "PipelineConfig" (Decisión 7) y su invariante exige que solo pueda activarse junto con `dry_run=True`. Bajo este modo combinado, el pipeline omite tanto la interpolación, post-validation y escritura (por `dry_run`) como la pre-validation geoespacial y de compatibilidad método/variable (por `skip_pre_validation`), dejando solo `detect → generate_report` con outputs vacíos y `validation_pre=[]`. El CLI extrae `result.detection` del `PipelineResult` y lo renderiza.
 
 ```
 config = _build_pipeline_config(..., dry_run=True, skip_pre_validation=True)
@@ -266,7 +266,7 @@ render_detection(result.detection)
 exit(0)
 ```
 
-**Trade-off considerado:** importar `tempify.detection` directamente sería más eficiente pero rompe la regla arquitectónica REQ-012. Se prefiere la ruta vía pipeline aunque agregue ~50ms de overhead (aún dentro de NFR-003 porque `inspect` no es el camino crítico de cold start).
+**Trade-off considerado:** importar `tempify.detection` directamente sería más eficiente pero rompe la regla arquitectónica REQ-012. Se prefiere la ruta vía pipeline aunque agregue ~50ms de overhead (aún dentro de NFR-003 porque `inspect` no es el camino crítico de cold start). El test `test_cli_imports_only_pipeline` sigue siendo válido sin modificación: el CLI continúa importando exclusivamente `tempify.pipeline` (más `tempify.profiles`, `typer`, `rich`, stdlib).
 
 ### Algoritmo `validate`
 
