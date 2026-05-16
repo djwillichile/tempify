@@ -155,7 +155,7 @@ COLLECT(name='tempify-0.1.0')   # onedir
 
 | Variable | Valor |
 |---|---|
-| `AppId` | `{{F2A5C8E1-7B3D-4F2A-9E1C-TEMPIFY00001}}` (GUID estable para upgrades) |
+| `AppId` | `{{B7A21C3D-4E5F-4A8B-9C2D-1F3E5A7B9C0D}}` (GUID estable para upgrades) |
 | `AppName` | `tempify` |
 | `AppVersion` | `0.1.0` (sustituido por CI desde tag) |
 | `AppPublisher` | `Guillermo Fuentes-Jaque` |

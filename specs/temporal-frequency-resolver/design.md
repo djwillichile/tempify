@@ -282,9 +282,9 @@ Tabla de los cuatro parsers obligatorios (REQ-010). Las regex aquí son ilustrat
 | `WorldClimParser` | `worldclim` | `^wc2\.1_(?:30s\|2\.5m\|5m\|10m)_[a-z]+_(\d{2})\.tif$` | `MONTHLY` | 0.9 |
 | `ChelsaParser` | `chelsa` | `^CHELSA_[a-z]+_(\d{2})_\d{4}_V\.\d\.\d\.tif$` | `MONTHLY` | 0.9 |
 | `ChirpsParser` | `chirps` | `^chirps-v2\.0\.(\d{4})\.(\d{2})\.(\d{2})\.tif$` | `DAILY` | 0.9 |
-| `Era5Parser` | `era5` | `^era5(?:-land)?_[a-z0-9_]+_(\d{4})(\d{2})(\d{2})(\d{2})\.(?:nc\|tif)$` | `HOURLY` o `DAILY` (según hora capturada) | 0.9 |
+| `Era5Parser` | `era5` | `^era5_(?P<var>[a-z0-9_]+)_(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})_(?P<hour>\d{2})\.(nc\|tif)$` | `HOURLY` (con `hour`) / `DAILY` (sin `hour`) | 0.9 / 0.85 |
 
-`Era5Parser` desambigua entre `HOURLY` y `DAILY` inspeccionando el grupo de hora: si todos los nombres del set contienen `_00.` (hora 00 fija), se asume agregado diario; si la hora varía, `HOURLY`.
+`Era5Parser` usa cinco grupos nombrados (`var`, `year`, `month`, `day`, `hour`) y desambigua por la presencia del grupo `hour` en el match: si `hour` está capturado, la frecuencia es `HOURLY` con confidence `0.9`; si los nombres del set no incluyen la parte `_hh` (grupo `hour` ausente), el parser devuelve `frequency=DAILY` con confidence `0.85`. La regla "presencia/ausencia del grupo" sustituye la heurística previa basada en hora fija `_00.`, que era ambigua frente a regex con grupo posicional.
 
 ## 7. Decisiones de diseño
 
@@ -335,7 +335,7 @@ Tabla de los cuatro parsers obligatorios (REQ-010). Las regex aquí son ilustrat
 - `test_tier_worldclim_pattern_match` — set canónico `wc2.1_30s_tavg_01.tif`...`12.tif` → `MONTHLY`, 0.9.
 - `test_tier_chelsa_pattern_match` — análogo para CHELSA.
 - `test_tier_chirps_pattern_match` — set CHIRPS diario → `DAILY`, 0.9.
-- `test_tier_era5_pattern_match` — set ERA5 horario → `HOURLY`; set ERA5 con hora fija `_00.` → `DAILY`.
+- `test_tier_era5_pattern_match` — set ERA5 con sufijo `_hh` (grupo `hour` capturado) → `HOURLY` con confidence `0.9`; set ERA5 sin sufijo `_hh` (grupo `hour` ausente) → `DAILY` con confidence `0.85`.
 - `test_tier_heuristic_count_12_means_monthly` — 12 archivos con token `\d{4}` → `MONTHLY`; sin token → `CLIMATOLOGICAL`.
 - `test_tier_heuristic_count_365_means_daily` — 365 archivos sin nombres reconocibles.
 - `test_callback_invoked_when_ambiguous` — todos los tiers retornan None excepto callback, que se llama con `partial_evidence`.

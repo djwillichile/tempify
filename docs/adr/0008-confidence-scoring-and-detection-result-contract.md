@@ -37,6 +37,25 @@ Este ADR resuelve la discrepancia fijando el shape canónico y el algoritmo de c
 
 Las claves son obligatorias en todos los modos. Cuando una clave no aplica al modo, el detector asigna el valor neutro documentado (típicamente `1.0`) en lugar de omitirla, para preservar la estabilidad del schema.
 
+### Composición por capas
+
+El `DetectionConfidence` con las seis claves canónicas es el **shape final** consumido por Pipeline, GUI, CLI y `ProcessingReport`. Sin embargo, **ninguna capa individual puede computarlo por sí sola**: cada capa observa solo un subconjunto de las señales necesarias. Para evitar que las capas rellenen claves ajenas con valores "neutros" inventados (lo que falsearía la confianza), se establece el siguiente protocolo de composición:
+
+1. **Sólo el Pipeline (Capa 5, `tempify.pipeline`) construye el `DetectionConfidence` final.** Es el único punto del sistema autorizado a ensamblar las seis claves y a stamp-ear el resultado en el `DetectionResult` global.
+2. **Cada capa contribuyente expone un subset tipado** nombrado `<Capa>ConfidencePartial` (TypedDict). Los subsets son disjuntos respecto a las claves canónicas y su unión cubre exactamente cinco de las seis claves; la sexta (`overall`) la computa el pipeline.
+3. **El pipeline ensambla los subsets** vía merge superficial, valida invariantes (presencia de las seis claves, rangos `[0.0, 1.0]`) y calcula `overall` como la media ponderada definida en el algoritmo de cómputo más abajo.
+
+Capas contribuyentes y subsets:
+
+| Capa / módulo | Subset tipado | Claves aportadas |
+|---|---|---|
+| `structure-detection` (`tempify.detection.structure`) | `StructureConfidencePartial` | `structure_mode`, `homogeneity` |
+| `temporal-frequency-resolver` (`tempify.detection.frequency`) | `FrequencyConfidencePartial` | `temporal_frequency`, `temporal_frequency_tier` |
+| `variable-profile-matcher` (`tempify.validation.variable_profile`) | `VariableConfidencePartial` | `variable_profile` |
+| `tempify.pipeline` | (ensamblador) | `overall` (media ponderada) |
+
+Esta composición **no relaja el contrato canónico del ADR**: el `DetectionConfidence` final que cualquier consumidor downstream observa sigue teniendo las seis claves obligatorias y los rangos garantizados. Lo que se documenta aquí es la **frontera de responsabilidad** entre productores parciales y ensamblador, evitando ambigüedad sobre dónde se calcula `overall` y quién valida la presencia de todas las claves.
+
 ### 2. Algoritmo de cómputo
 
 Mezcla determinista basada en señales positivas/negativas (no ML). Reproducible bit-exact dado el mismo input y los mismos pesos. Pseudocódigo de referencia:
