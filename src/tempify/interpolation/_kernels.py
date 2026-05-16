@@ -111,6 +111,76 @@ def pchip_kernel(
     return np.asarray(pchip(x_out))
 
 
+def pchip_mp_kernel(
+    m: NDArray[np.floating],
+    x_in: NDArray[np.floating],
+    x_out: NDArray[np.floating],
+    day_to_month: NDArray[np.integer],
+    cyclic: bool,
+    convergence_tol: float,
+    max_iterations: int,
+) -> tuple[NDArray[np.floating], int]:
+    """PCHIP baseline + Rymes-Myers iterative mean-preserving correction.
+
+    The algorithm follows the simplest variant of Rymes & Myers (2001):
+
+    1. Initialize daily values with a PCHIP interpolation of the monthly
+       midpoints (auxiliary nodes, per ADR-0010 nivel 1).
+    2. Iteratively compute the reconstructed monthly means from the daily
+       values, find the residual ``error_m = original_m - reconstructed_m``
+       per month, and distribute the residual uniformly across the days of
+       that month.
+    3. Stop when ``max |error_m| < convergence_tol`` or after
+       ``max_iterations`` rounds.
+
+    Parameters
+    ----------
+    m : numpy.ndarray
+        12 monthly values to preserve.
+    x_in : numpy.ndarray
+        Day-of-year of each monthly anchor (length 12).
+    x_out : numpy.ndarray
+        Day-of-year targets (length N).
+    day_to_month : numpy.ndarray
+        Integer array of length N mapping each output day to its month
+        index in [0, 11].
+    cyclic : bool
+        Forwarded to the PCHIP baseline initialization (per REQ-004 and
+        ADR-0016 wraparound).
+    convergence_tol : float
+        Maximum absolute residual accepted in the variable's units.
+    max_iterations : int
+        Hard cap on iterations (safety guard).
+
+    Returns
+    -------
+    tuple[numpy.ndarray, int]
+        ``(daily_values, iterations_used)``. The second element is the
+        number of correction iterations applied; ``0`` means the PCHIP
+        baseline already met the tolerance.
+    """
+    daily = pchip_kernel(m, x_in, x_out, cyclic=cyclic).copy()
+    iterations_used = 0
+    for iteration in range(1, max_iterations + 1):
+        recon = np.zeros(m.size, dtype=np.float64)
+        counts = np.zeros(m.size, dtype=np.int64)
+        for i in range(daily.size):
+            mo = int(day_to_month[i])
+            recon[mo] += daily[i]
+            counts[mo] += 1
+        recon = recon / counts
+        errors = m - recon
+        max_err = float(np.max(np.abs(errors)))
+        if max_err < convergence_tol:
+            iterations_used = iteration - 1
+            break
+        for i in range(daily.size):
+            mo = int(day_to_month[i])
+            daily[i] += errors[mo]
+        iterations_used = iteration
+    return daily, iterations_used
+
+
 def fourier_kernel(
     m: NDArray[np.floating],
     x_in: NDArray[np.floating],
