@@ -59,7 +59,7 @@ WHEN the user invokes any interpolation method on a monthly stack, THE SYSTEM SH
 
 ### REQ-004 (Ubiquitous)
 
-THE SYSTEM SHALL handle cyclic boundary conditions by default: December connects smoothly to January without extrapolation artifacts.
+THE SYSTEM SHALL handle cyclic boundary conditions by default: December connects smoothly to January without extrapolation artifacts. Esta continuidad es alcanzada vía el mecanismo de **climatological wraparound** formalizado en REQ-015 y ADR-0016, no como un detalle interno del kernel.
 
 ### REQ-005a (Optional)
 
@@ -113,6 +113,24 @@ THE SYSTEM SHALL position each monthly input value at the canonical midpoint of 
 
 WHERE the caller provides `monthly_anchor='start'`, `'end'`, or `'custom'` instead of the default `'midpoint'`, THE SYSTEM SHALL position monthly values at the requested anchor. With `'custom'`, the caller must additionally provide an explicit `time_axis: list[datetime]` of length 12 (or matching the input length).
 
+### REQ-015 (Ubiquitous)
+
+THE SYSTEM SHALL apply **climatological wraparound** by default when the input has exactly 12 monthly values: month 12 (December) is duplicated as the implicit "month 0" positioned at `x_in[11] - period` (December of the previous year) and month 1 (January) is duplicated as the implicit "month 13" positioned at `x_in[0] + period` (January of the next year). This expands the effective interpolation domain from 12 to at minimum 14 anchor points (per ADR-0016). Individual methods MAY extend the padding further to gain additional context:
+
+- **Linear:** exact 14 effective points (1 padding per side).
+- **PCHIP / PCHIP+RM:** 16 effective points (2 padding per side) to ensure C¹ continuity at the December-January boundary.
+- **Fourier:** no explicit padding required; the FFT implicitly treats the 12 monthly inputs as periodic samples and the wraparound semantics are inherent. The output is stamped with `attrs["tempify_wraparound"] = "fft_implicit"`.
+
+The output `DataArray` always carries `attrs["tempify_wraparound"]` with one of the canonical values: `"climatological_2pt"`, `"climatological_4pt"`, `"fft_implicit"`, or `"off"`.
+
+### REQ-016 (Optional)
+
+WHERE the caller passes `wraparound=False`, THE SYSTEM SHALL disable the artificial domain extension and treat the 12 monthly inputs as a bare finite sequence. Out-of-range positions (before `x_in[0]` or after `x_in[11]`) are then handled per REQ-005a/b/c by method. Fourier remains periodic by construction (FFT inherent) regardless of `wraparound`; in that case the stamp `attrs["tempify_wraparound"] = "fft_implicit"` is preserved with a `DataArray.attrs["tempify_wraparound_user_request"] = "off"` note for traceability.
+
+### REQ-017 (Unwanted)
+
+IF the caller passes contradictory values of `cyclic` and `wraparound` (e.g., `cyclic=True, wraparound=False`), THEN THE SYSTEM SHALL raise `ValueError("cyclic and wraparound must agree; in v0.2.0 cyclic will be deprecated in favor of wraparound")`. `cyclic` is preserved in v0.1.0 as a retrocompatible synonym of `wraparound` and is scheduled for deprecation in v0.2.0.
+
 ## 5. Requisitos no funcionales
 
 | ID | Categoría | Requisito | Criterio verificable |
@@ -139,6 +157,9 @@ WHERE the caller provides `monthly_anchor='start'`, `'end'`, or `'custom'` inste
 - [ ] REQ-012 cubierto por test `test_duplicate_or_noncontiguous_months_raises`
 - [ ] REQ-013 cubierto por tests `test_temporal_axis_midpoint_table`, `test_linear_input_nodes_at_midpoint`
 - [ ] REQ-014 cubierto por tests `test_monthly_anchor_start_shifts_nodes`, `test_custom_anchor_requires_explicit_dates`
+- [ ] REQ-015 cubierto por tests `test_climatological_wraparound_adds_2pt_linear`, `test_climatological_wraparound_adds_4pt_pchip`, `test_wraparound_attr_stamped`
+- [ ] REQ-016 cubierto por tests `test_wraparound_false_disables_extension_linear`, `test_wraparound_false_disables_extension_pchip`
+- [ ] REQ-017 cubierto por test `test_contradictory_cyclic_wraparound_raises`
 - [ ] NFR-001 medido y dentro del umbral
 - [ ] NFR-002 verificado con 100+ casos de hypothesis
 - [ ] NFR-003 verificado en ambos modos (`strict` y `parallel`) per ADR-0007
@@ -173,4 +194,5 @@ WHERE the caller provides `monthly_anchor='start'`, `'end'`, or `'custom'` inste
 - Rymes, M. D., & Myers, D. R. (2001). Mean preserving algorithm for smoothly interpolating averaged data. *Solar Energy*, 71(4), 225-231.
 - Validación experimental previa: experimento Quinta Normal 2020 (ver `docs/methodology/empirical-validation-quinta-normal.md`).
 - [ADR-0015](../../docs/adr/0015-monthly-value-temporal-placement.md) — Convención midpoint para el posicionamiento temporal de valores mensuales.
+- [ADR-0016](../../docs/adr/0016-climatological-wraparound.md) — Climatological wraparound como feature de primer orden, parámetro `wraparound` y semántica por método.
 - CF Conventions §7.4 — Climatological statistics y semántica de celdas de tiempo (https://cfconventions.org/Data/cf-conventions/cf-conventions-1.11/cf-conventions.html#climatological-statistics).

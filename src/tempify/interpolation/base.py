@@ -182,6 +182,14 @@ class BaseInterpolator(ABC):
     """Common interface and shared validations for all temporal interpolators."""
 
     name: ClassVar[str] = "base"
+    wraparound_stamp_on: ClassVar[str] = "climatological_2pt"
+    """Value of ``attrs['tempify_wraparound']`` when wraparound is active.
+
+    Subclasses override this to declare how much padding they use:
+    ``climatological_2pt`` for Linear (1 node per side, 14 effective),
+    ``climatological_4pt`` for PCHIP family (2 nodes per side, 16 effective),
+    ``fft_implicit`` for Fourier (no explicit padding, FFT-periodic).
+    """
 
     @abstractmethod
     def interpolate(
@@ -190,6 +198,7 @@ class BaseInterpolator(ABC):
         target_axis: TemporalAxis,
         *,
         cyclic: bool = True,
+        wraparound: bool | None = None,
         nan_policy: NanPolicy = "raise",
         chunk_size: int | None = None,
     ) -> xr.DataArray:
@@ -203,9 +212,16 @@ class BaseInterpolator(ABC):
         target_axis : TemporalAxis
             Destination temporal coordinate.
         cyclic : bool, default True
-            If True, treat December and January as adjacent in the
-            interpolation (per REQ-004). If False, apply method-specific
-            extrapolation (per REQ-005a/b/c).
+            Retro-compatible synonym of ``wraparound`` (per REQ-017 and
+            ADR-0016). Will be deprecated in v0.2.0 in favor of
+            ``wraparound``. If True, treat December and January as
+            adjacent in the interpolation (per REQ-004). If False, apply
+            method-specific extrapolation (per REQ-005a/b/c).
+        wraparound : bool | None, default None
+            When not ``None``, must equal ``cyclic`` (per REQ-017) else
+            raises ``ValueError``. When ``None`` (default), the value of
+            ``cyclic`` is used. Controls whether climatological wraparound
+            is active (per REQ-015 / ADR-0016).
         nan_policy : Literal['raise', 'propagate_all', 'skip_pixel']
             Behavior for pixels with partial NaN values (per REQ-008).
         chunk_size : int | None
@@ -246,15 +262,34 @@ class BaseInterpolator(ABC):
         if nan_policy not in allowed:
             raise ValueError(f"nan_policy must be one of {allowed}, got {nan_policy!r}")
 
-    def _postprocess(self, result: xr.DataArray, target_axis: TemporalAxis) -> xr.DataArray:
+    def _resolve_wraparound(self, cyclic: bool, wraparound: bool | None) -> bool:
+        """Resolve cyclic/wraparound consistency per REQ-017 and ADR-0016."""
+        if wraparound is None:
+            return cyclic
+        if wraparound != cyclic:
+            raise ValueError(
+                "cyclic and wraparound must agree; in v0.2.0 cyclic will be "
+                f"deprecated in favor of wraparound. Got cyclic={cyclic}, "
+                f"wraparound={wraparound}."
+            )
+        return wraparound
+
+    def _postprocess(
+        self,
+        result: xr.DataArray,
+        target_axis: TemporalAxis,
+        wraparound: bool = True,
+    ) -> xr.DataArray:
         """Attach standard provenance attributes to the interpolated DataArray.
 
-        Adds ``tempify_method`` (the interpolator class name) and
-        ``tempify_monthly_anchor`` (the anchor convention used). Concrete
-        interpolators may attach additional attributes specific to their
-        method (e.g., ``rymes_myers_iterations`` per REQ-007).
+        Adds ``tempify_method`` (the interpolator class name),
+        ``tempify_monthly_anchor`` (the anchor convention used), and
+        ``tempify_wraparound`` (climatological wraparound mode per ADR-0016).
+        Concrete interpolators may attach additional attributes specific
+        to their method (e.g., ``rymes_myers_iterations`` per REQ-007).
         """
         out = result.copy()
         out.attrs["tempify_method"] = self.name
         out.attrs["tempify_monthly_anchor"] = target_axis.monthly_anchor
+        out.attrs["tempify_wraparound"] = self.wraparound_stamp_on if wraparound else "off"
         return out
