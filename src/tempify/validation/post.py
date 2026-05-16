@@ -79,7 +79,13 @@ class PostInterpolationValidator:
     ) -> CheckResult:
         atol = float(min(self.atol, profile.acceptable_mean_error))
         agg = self._aggregate_to_monthly(daily_output)
-        diff = float(np.nanmax(np.abs(agg.values - monthly_input.values)))
+        # Align dim order with the monthly_input shape so the comparison
+        # broadcasts correctly regardless of which dim leads.
+        try:
+            agg_aligned = agg.transpose(*monthly_input.dims)
+        except ValueError:
+            agg_aligned = agg
+        diff = float(np.nanmax(np.abs(agg_aligned.values - monthly_input.values)))
         ok = bool(np.isfinite(diff)) and (
             diff <= atol + self.rtol * float(np.nanmax(np.abs(monthly_input.values)))
         )
