@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `docs/tutorials/01-getting-started.ipynb`: Colab notebook que recorre la API pública de `tempify` v0.1.0 end-to-end sobre el sample sintético WorldClim Chile Central. Demuestra los cuatro métodos de interpolación, la garantía de conservación de media de `pchip_mp`, y el reporte de procedencia. Reproducible en Google Colab vía badge "Open in Colab".
+
 ### Pendiente para v0.2.0
 
 - Capa 7 (GUI) basada en PySide6 (deferred del v0.1.0).
