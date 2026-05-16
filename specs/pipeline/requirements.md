@@ -49,7 +49,7 @@ Definir la capa de orquestación end-to-end de tempify (`tempify.pipeline`): la 
 
 > Como GUI, quiero suscribirme a un callback de progreso por fase y por porcentaje para actualizar una barra de progreso y un panel de estado sin acoplarme a la implementación interna del pipeline.
 
-**Caso de uso típico:** La GUI registra un `ProgressCallback` en el `PipelineConfig`. El pipeline lo invoca al entrar en cada fase (`"detect"`, `"validate_geospatial"`, `"validate_compatibility"`, `"interpolate"`, `"validate_post"`, `"write"`, `"report"`) y periódicamente durante la interpolación con el porcentaje de píxeles procesados.
+**Caso de uso típico:** La GUI registra un `ProgressCallback` en el `PipelineConfig`. El pipeline lo invoca al entrar en cada fase (`"detect"`, `"validate_geospatial"`, `"validate_compatibility"`, `"interpolate"`, `"validate_post"`, `"write"`, `"generate_report"`) y periódicamente durante la interpolación con el porcentaje de píxeles procesados.
 
 ## 4. Requisitos funcionales (formato EARS)
 
@@ -72,12 +72,13 @@ class ProgressCallback(Protocol):
     def __call__(
         self,
         phase: Literal[
-            "detection",
-            "validation_pre",
-            "interpolation",
-            "validation_post",
+            "detect",
+            "validate_geospatial",
+            "validate_compatibility",
+            "interpolate",
+            "validate_post",
             "write",
-            "report",
+            "generate_report",
         ],
         progress: float,  # [0.0, 1.0]
         message: str | None = None,
@@ -126,7 +127,7 @@ WHERE the caller provides an optional `frequency_resolver_callback: FrequencyRes
 |---|---|---|---|
 | NFR-001 | Performance | El overhead total del pipeline (detect + validate + report) debe ser <5% del tiempo de interpolación pura sobre el benchmark canónico (WorldClim Chile 2.5min, 12 meses) | Benchmark `tests/benchmark/test_pipeline_overhead.py` que compara `TempifyPipeline.run()` vs `PchipMeanPreservingInterpolator.interpolate()` directo |
 | NFR-002 | Reliability | Reproducibilidad bit-exact entre ejecuciones independientes con mismos inputs y config | Test `test_pipeline_md5_reproducible` que ejecuta `run()` dos veces y compara MD5 de outputs |
-| NFR-003 | Usability | Frecuencia del callback de progreso configurable; valor por defecto cada 5% de píxeles procesados durante interpolación | Test `test_pipeline_progress_callback_frequency` parametrizado en 1%, 5%, 10% |
+| NFR-003 | Usability | Frecuencia del callback de progreso configurable vía `PipelineConfig.progress_frequency_hz`, valor por defecto `4` Hz (ver REQ-003); aplica especialmente a la fase `interpolate` donde el progreso se emite proporcional al porcentaje de píxeles procesados | Test `test_pipeline_progress_callback_frequency` parametrizado en `1`, `4`, `10` Hz |
 | NFR-004 | Memory | El pipeline no debe mantener simultáneamente en memoria dos copias completas del `DataArray` (input y output): la lazy evaluation de xarray/Dask debe preservarse end-to-end hasta el writer | Profiling con memray sobre stack 12×3000×500 verificando pico de memoria <2× del tamaño de un único stack |
 | NFR-005 | Maintainability | Cobertura de tests del módulo `tempify.pipeline` ≥85% | `pytest --cov=tempify.pipeline --cov-fail-under=85` |
 | NFR-006 | Usability | Mensajes de error en español con código referenciable | Test `test_pipeline_error_messages_spanish` |
