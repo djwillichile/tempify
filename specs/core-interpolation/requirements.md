@@ -28,6 +28,7 @@ El posicionamiento de los nodos de entrada sobre el eje temporal sigue la conven
 - Interpolación espacial (la resolución no cambia).
 - Métodos estocásticos / weather generators.
 - Interpolación de precipitación con métodos suaves (rechazada por diseño). El rechazo de precipitación es enforced por `MethodVariableCompatibilityChecker` en `validation` per ADR-0004; esta spec solo provee los algoritmos.
+- Métodos basados en redes neuronales pre-entrenadas (ClimaX, Pangu-Weather, GraphCast, FourCastNet, etc.). Diferidos a v0.2.0 en una spec separada `neural-interpolation`. El ABC `BaseInterpolator` es deliberadamente abierto para soportarlos cuando se aborde. Ver [ADR-0017](../../docs/adr/0017-neural-interpolator-extensibility.md).
 
 ## 3. Actores y casos de uso
 
@@ -195,4 +196,5 @@ IF the caller passes contradictory values of `cyclic` and `wraparound` (e.g., `c
 - Validación experimental previa: experimento Quinta Normal 2020 (ver `docs/methodology/empirical-validation-quinta-normal.md`).
 - [ADR-0015](../../docs/adr/0015-monthly-value-temporal-placement.md) — Convención midpoint para el posicionamiento temporal de valores mensuales.
 - [ADR-0016](../../docs/adr/0016-climatological-wraparound.md) — Climatological wraparound como feature de primer orden, parámetro `wraparound` y semántica por método.
+- [ADR-0017](../../docs/adr/0017-neural-interpolator-extensibility.md) — Extensibilidad para métodos basados en redes neuronales (deferred a v0.2.0).
 - CF Conventions §7.4 — Climatological statistics y semántica de celdas de tiempo (https://cfconventions.org/Data/cf-conventions/cf-conventions-1.11/cf-conventions.html#climatological-statistics).
