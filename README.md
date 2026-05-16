@@ -3,6 +3,15 @@
 > **Densificación temporal para stacks ráster geoespaciales.**
 > *Generate more data between your existing data.*
 
+[![Tests](https://img.shields.io/badge/tests-241%20passing-brightgreen)](https://github.com/djwillichile/tempify/actions)
+[![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)](https://github.com/djwillichile/tempify)
+[![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+<!-- DOI badge se agrega tras el primer GitHub Release: Zenodo lo mintea automáticamente.
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.XXXXXXX.svg)](https://doi.org/10.5281/zenodo.XXXXXXX)
+-->
+
+
 ## ¿Qué es?
 
 `tempify` es una librería Python + CLI que realiza **densificación temporal** sobre stacks ráster geoespaciales. Toma una serie de rásters muestreada a baja frecuencia (por ejemplo, 12 valores mensuales) y genera una serie densa (365 o 366 valores diarios) preservando propiedades estadísticas críticas como la conservación de la media mensual.
@@ -29,31 +38,43 @@ Numerosos productos geoespaciales se distribuyen a frecuencia mensual o climatol
 - No es un weather generator estocástico (no inventa variabilidad sinóptica).
 - No interpola precipitación con métodos suaves (rechazado por diseño).
 
-## Instalación (planificada)
+## Instalación
 
 ```bash
-pip install tempify
-# o
-conda install -c conda-forge tempify
+# Desde el repo (recomendado para v0.1.0)
+git clone https://github.com/djwillichile/tempify.git
+cd tempify
+pip install -e ".[dev]"
+
+# pip / conda-forge: planificado para v0.1.x cuando el paquete suba a PyPI
 ```
 
-## Ejemplo mínimo (planificado)
+Requiere Python 3.11, 3.12 o 3.13.
+
+## Ejemplo mínimo
 
 ```bash
 # CLI
 tempify convert ./worldclim_chile/ \
     --method pchip_mp \
-    --output ./worldclim_chile_daily.nc
+    --year 2023 \
+    --output ./out/ \
+    --report ./out/report.md
 ```
 
 ```python
 # API Python
-from tempify import densify_temporal
-import xarray as xr
+from pathlib import Path
+from tempify.pipeline import PipelineConfig, TempifyPipeline
 
-monthly = xr.open_dataset("worldclim_monthly.nc")["tavg"]
-daily = densify_temporal(monthly, target_freq="daily", method="pchip_mp")
-daily.to_netcdf("worldclim_daily.nc")
+cfg = PipelineConfig(
+    method="pchip_mp",
+    target_year=2023,
+    output_dir=Path("./out"),
+)
+result = TempifyPipeline(cfg).run(Path("./worldclim_chile/"))
+print(result.outputs)        # [PosixPath('./out/tempify_output.nc')]
+print(result.report.method)  # 'pchip_mp'
 ```
 
 ## Métodos disponibles
@@ -67,7 +88,9 @@ daily.to_netcdf("worldclim_daily.nc")
 
 ## Estado del proyecto
 
-🚧 **En desarrollo activo.** Versión 0.1.0-dev.
+**v0.1.0 — primer release funcional** (2026-05-16). Capas 1-6 implementadas (I/O, Detection, Validation, Interpolation, Pipeline, CLI), 241 tests passing, 91% coverage, 17 ADRs documentados.
+
+**Diferido a v0.2.0:** GUI PySide6, instalador Windows .exe, integración de redes neuronales pre-entrenadas bajo patrón híbrido (ver [ADR-0017](docs/adr/0017-neural-interpolator-extensibility.md)).
 
 Este repositorio sigue **Spec-Driven Development** y **Harness Engineering**. Toda implementación está precedida por una spec aprobada en `specs/`. Ver `CLAUDE.md` para el régimen de trabajo.
 
@@ -131,11 +154,18 @@ MIT License. Ver `LICENSE`.
 
 ## Citar este software
 
-Una vez publicado:
+Para citar este software use la información del archivo [CITATION.cff](CITATION.cff). Tras el primer GitHub Release, Zenodo asigna automáticamente un DOI; actualice este bloque cuando esté disponible.
 
-```
-Fuentes-Jaque, G. (2026). tempify: Temporal densification for geospatial
-raster stacks. [Software]. DOI: 10.5281/zenodo.XXXXXXX
+```bibtex
+@software{fuentes_jaque_tempify_2026,
+  author       = {Fuentes-Jaque, Guillermo},
+  title        = {{tempify}: Temporal densification for geospatial raster stacks},
+  year         = 2026,
+  publisher    = {Zenodo},
+  version      = {0.1.0},
+  doi          = {10.5281/zenodo.XXXXXXX},
+  url          = {https://github.com/djwillichile/tempify}
+}
 ```
 
 ## Contacto
