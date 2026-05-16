@@ -1,0 +1,62 @@
+cff-version: 1.2.0
+message: "Si usas tempify en investigación, por favor cita el software como sigue."
+title: "tempify: Temporal densification for geospatial raster stacks"
+type: software
+authors:
+  - family-names: "Fuentes-Jaque"
+    given-names: "Guillermo"
+    email: "guillermo.f1990@gmail.com"
+    orcid: "https://orcid.org/0000-0000-0000-0000"  # TODO: agregar ORCID real cuando esté disponible
+abstract: >-
+  tempify realiza densificación temporal de stacks ráster geoespaciales:
+  toma una serie muestreada a baja frecuencia (típicamente 12 valores mensuales)
+  y genera una serie densa (365 o 366 valores diarios) preservando propiedades
+  estadísticas críticas como la conservación de la media mensual. Aplicable a
+  productos como WorldClim, CHELSA, CRU-TS, TerraClimate.
+keywords:
+  - geospatial
+  - raster
+  - temporal-densification
+  - interpolation
+  - climate
+  - worldclim
+  - xarray
+  - python
+license: MIT
+repository-code: "https://github.com/djwillichile/tempify"
+url: "https://github.com/djwillichile/tempify"
+version: "0.1.0"
+date-released: "2026-05-16"
+# Cuando publiques v0.1.0 en Zenodo, agrega aquí:
+# doi: "10.5281/zenodo.XXXXXXX"
+# identifiers:
+#   - type: doi
+#     value: "10.5281/zenodo.XXXXXXX"
+#     description: "Versión 0.1.0 archivada en Zenodo"
+references:
+  - type: article
+    authors:
+      - family-names: "Rymes"
+        given-names: "M. D."
+      - family-names: "Myers"
+        given-names: "D. R."
+    title: "Mean preserving algorithm for smoothly interpolating averaged data"
+    journal: "Solar Energy"
+    volume: 71
+    issue: 4
+    year: 2001
+    start: 225
+    end: 231
+  - type: article
+    authors:
+      - family-names: "Fritsch"
+        given-names: "F. N."
+      - family-names: "Carlson"
+        given-names: "R. E."
+    title: "Monotone piecewise cubic interpolation"
+    journal: "SIAM Journal on Numerical Analysis"
+    volume: 17
+    issue: 2
+    year: 1980
+    start: 238
+    end: 246
