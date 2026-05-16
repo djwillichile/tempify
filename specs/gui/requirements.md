@@ -1,6 +1,6 @@
-# Requirements — gui
+﻿# Requirements — gui
 
-**Estado:** Draft
+**Estado:** Approved
 **Owner:** Guillermo Fuentes-Jaque
 **Fecha creación:** 2026-05-16
 **Última actualización:** 2026-05-16
