@@ -1,0 +1,10 @@
+name: relative_humidity
+canonical_name: relative_humidity
+units: "%"
+aliases: [rh, hr, humedad_relativa]
+allowed_methods: [linear, pchip, pchip_mp, fourier]
+physical_range:
+  min: 0.0
+  max: 100.0
+acceptable_mean_error: 0.5
+description: "Humedad relativa media mensual."
