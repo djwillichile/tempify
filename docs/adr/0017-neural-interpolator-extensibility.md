@@ -31,7 +31,80 @@ Cuando se aborde, la spec `neural-interpolation` debe cubrir al menos:
 - **Adapter para ≥1 modelo público con licencia compatible.** Candidatos prioritarios: ClimaX (MIT), Pangu-Weather (BSD-3), FourCastNet (BSD-3). GraphCast (Apache-2.0 con cláusulas) requiere revisión legal antes.
 - **Cache local de pesos** en `~/.cache/tempify/models/<model_id>/` con verificación SHA256 contra manifest versionado.
 - **Detección automática GPU/CPU** con fallback transparente. GPU es opcional (extra `tempify[neural-gpu]`), CPU es default.
-- **Modo `hybrid`**: el método clásico (Linear/PCHIP/RM/Fourier) genera la baseline mean-preserving, y el NN añade la varianza diaria sintética encima. Este modo combina lo mejor de ambos enfoques y es el más defendible científicamente.
+- **Patrón híbrido como arquitectura elegida** (ver sección dedicada abajo). Es el modo **default** de la spec `neural-interpolation`, no una opción accesoria.
+
+### Patrón híbrido como arquitectura elegida para v0.2.0
+
+**Decisión clave para v0.2.0:** los métodos basados en redes neuronales se integrarán bajo el patrón **"clásico como baseline + NN como refinement"**, no como reemplazo del método clásico. Esta decisión se justifica por:
+
+1. **Conservación de la media:** los métodos clásicos (especialmente PCHIP+RM) tienen una garantía matemática rigurosa de conservación de la media mensual (ADR-0010). Una NN pura no la tiene; un NN refinement aplicado sobre un baseline mean-preserving puede preservarla si el residuo se restringe a tener media cero por mes.
+2. **Varianza sinóptica:** los métodos clásicos suaves NO pueden recuperar la varianza diaria real (limitación intrínseca documentada como supuesto en `core-interpolation/requirements.md` §7). Una NN entrenada en datos de reanálisis horario sí puede aportar esa varianza realista. La combinación supera a cada uno por separado.
+3. **Reproducibilidad y robustez:** si la NN falla, está mal calibrada, o no soporta una región, el baseline clásico garantiza un output válido siempre. La degradación es graceful.
+4. **Trazabilidad científica:** el output stamps tanto el método clásico baseline como el modelo NN aplicado, dando reproducibilidad completa.
+
+#### Contrato del patrón híbrido
+
+El patrón se implementa como un **wrapper de composición** que acepta cualquier `BaseInterpolator` clásico como baseline:
+
+```python
+# Bosquejo v0.2.0
+class HybridNeuralInterpolator(BaseInterpolator):
+    """Wraps a classical interpolator and applies a neural refinement on top.
+
+    The classical interpolator produces a mean-preserving baseline; the
+    neural model is invoked on the (input, baseline) pair to produce a
+    refinement delta that adds sub-monthly variance while preserving the
+    monthly aggregates (via a constrained correction).
+    """
+
+    def __init__(
+        self,
+        baseline: BaseInterpolator,  # ANY classical: Linear, Pchip, PchipMP, Fourier
+        neural_model: Literal["climax-base", "pangu-1h", "fourcastnet", "custom"],
+        device: Literal["cpu", "cuda", "auto"] = "auto",
+        preserve_monthly_mean: bool = True,  # constrain delta to have zero monthly mean
+        weights_dir: Path | None = None,
+        deterministic: bool = True,
+    ) -> None: ...
+
+    def interpolate(
+        self,
+        source: xr.DataArray,
+        target_axis: TemporalAxis,
+        *,
+        cyclic: bool = True,
+        wraparound: bool | None = None,
+        nan_policy: NanPolicy = "raise",
+        chunk_size: int | None = None,
+    ) -> xr.DataArray:
+        # 1) baseline_output = self.baseline.interpolate(source, target_axis, ...)
+        # 2) delta = neural_model.predict(source, baseline_output, target_axis)
+        # 3) if preserve_monthly_mean: delta = subtract_monthly_mean(delta, target_axis)
+        # 4) refined = baseline_output + delta
+        # 5) attrs stamps both baseline_method and neural_model
+        ...
+```
+
+#### Extensibilidad a todos los métodos clásicos
+
+El patrón híbrido es **agnóstico al baseline**: cualquier `BaseInterpolator` puede ser envuelto. Combinaciones soportadas en v0.2.0:
+
+| Baseline clásico | Combinación útil con NN | Razón |
+|---|---|---|
+| `LinearInterpolator` + NN | Hybrid-Linear | Útil cuando se quiere máxima simplicidad y baja sensibilidad a ruido en input. |
+| `PchipInterpolator` + NN | Hybrid-PCHIP | Mejor suavidad de la baseline antes de añadir varianza NN. |
+| `PchipMeanPreservingInterpolator` + NN | **Hybrid-RM (recomendado default)** | Conservación de la media rigurosa de la baseline + varianza diaria realista de la NN. Es la combinación científicamente más defendible. |
+| `FourierInterpolator` + NN | Hybrid-Fourier | Útil para señales con componentes armónicas dominantes claras. |
+
+El usuario elige el baseline pasando una instancia concreta al constructor: `HybridNeuralInterpolator(baseline=PchipMeanPreservingInterpolator(), neural_model="climax-base")`.
+
+#### Tests v0.2.0 obligatorios para el patrón híbrido
+
+- Composición funcional: `Hybrid(baseline=Linear).interpolate(...)` produce output con shape correcto.
+- Preservación de media cuando `preserve_monthly_mean=True`: agregando el output mensual a partir del refinement coincide con el input monthly (ADR-0010 tolerance).
+- Stamping correcto: `attrs["tempify_method"] = "hybrid_neural"`, `attrs["tempify_hybrid_baseline"]` = método clásico, `attrs["tempify_hybrid_neural_model"]` = id del modelo.
+- Determinismo opcional: con `deterministic=True` y la misma seed, dos ejecuciones producen `allclose` en GPU (no bit-exact por float32 NV).
+- Fallback graceful: si el modelo NN no se puede cargar, el wrapper retorna el output del baseline con `attrs["tempify_hybrid_neural_model"] = "failed"`.
 
 ### Out-of-scope v0.2.0
 
@@ -91,12 +164,23 @@ El `attrs` del output deberá incluir:
 
 ## Alternativas consideradas
 
+### v0.1.0: si incluir NN o diferir
+
 | Alternativa | Razón de rechazo en v0.1.0 |
 |---|---|
 | Implementar NN ahora en v0.1.0 | Footprint, complejidad de packaging, riesgo de licencia, tiempo de validación científica. v0.1.0 perdería su característica clave de "instalación ligera y reproducible". |
 | Hacer NN sea un plugin externo (`pip install tempify-neural` separado) | Posible y deseable a largo plazo. v0.2.0 lo evaluará. Pero antes hay que cerrar el contrato del ABC y la spec. |
 | Stub vacío en v0.1.0 sin implementación real | Mala UX (usuario llama método y obtiene NotImplementedError). Mejor declarar out-of-scope claramente. |
 | Solo herramienta de comparación (no método propio) | Subutiliza el potencial. La spec v0.2.0 lo evaluará como modo `--neural-compare` opcional, pero el método neural primario es más valioso. |
+
+### v0.2.0: arquitectura de la integración NN
+
+| Alternativa | Razón de rechazo / Aceptación |
+|---|---|
+| **NN como interpolador independiente** (`NeuralInterpolator(BaseInterpolator)` puro) | DESCARTADO como default. Útil como modo accesorio (e.g., comparación), pero pierde conservación de la media y robustez. Sin baseline, el fallback es nulo. |
+| **NN como prior/refinement sobre clásico** (`HybridNeuralInterpolator`, patrón b) | **ELEGIDO** como arquitectura default de v0.2.0. Conserva propiedades estadísticas del baseline, añade varianza diaria realista, fallback graceful, extensible a cualquier método clásico. |
+| **NN como reemplazo de un kernel específico** (e.g., reemplazar `linear_kernel` por NN inline) | DESCARTADO. Mezclaría capas de abstracción y haría imposible auditar/desactivar la NN sin reescribir el método. |
+| **Aprendizaje end-to-end del par (input mensual → output diario)** | DESCARTADO para v0.2.0 (sería v0.3.0+). Requiere training infrastructure, datos masivos, validación cross-region. Out-of-scope. |
 
 ## Consecuencias
 
