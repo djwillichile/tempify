@@ -107,6 +107,18 @@ class TemporalFrequencyResolver:
 ### `BaseFilenameParser`
 
 ```python
+@dataclass(frozen=True, slots=True)
+class ParseResult:
+    """Resultado de parsing por filename, ahora con info de fecha extraída."""
+    frequency: TemporalFrequency
+    confidence: float  # [0, 1]
+    time_point: datetime | None        # punto único si filename codifica fecha exacta
+    time_range: tuple[datetime, datetime] | None  # rango si codifica periodo
+    month_of_year: int | None          # 1..12 si solo hay mes-de-año sin año
+    year: int | None
+    band_index: int | None             # para multi-band GeoTIFF cuando aplica
+
+
 class BaseFilenameParser(ABC):
     """Parser de nomenclatura para una fuente de datos conocida."""
 
@@ -114,12 +126,12 @@ class BaseFilenameParser(ABC):
     confidence: ClassVar[float]    # Confianza declarativa (≤ 0.9 por REQ-003)
 
     @abstractmethod
-    def parse(self, filename: str) -> ResolutionResult | None:
-        """Intenta extraer la frecuencia. None si no matchea."""
+    def parse(self, filename: str) -> ParseResult | None:
+        """Intenta extraer frecuencia + fecha codificada. None si no matchea."""
 ```
 
 **Pre-condiciones:** `filename` es `Path.name` (no ruta completa), ya normalizado a NFC.
-**Post-condiciones:** Si retorna `ResolutionResult`, su `tier_used` es `FILENAME_PATTERN` y su `confidence == cls.confidence` (≤ 0.9).
+**Post-condiciones:** Si retorna `ParseResult`, su `frequency` es la nominal del catálogo y su `confidence ≤ 0.9` (REQ-003). El resolver consume el `ParseResult` para construir el `ResolutionResult` agregado y el `time_axis`.
 
 ### `FrequencyParserRegistry`
 
@@ -178,11 +190,17 @@ class ResolutionResult:
     tier_used: ResolutionTier
     confidence: float           # [0.0, 1.0]
     source_evidence: str        # <200 chars, sin newlines
+    time_axis: list[datetime] | None = None  # eje temporal ensamblado (REQ-011/REQ-013)
+    monthly_anchor_applied: Literal["midpoint", "start", "end", "custom"] | None = None  # REQ-012
+    calendar_agnostic: bool = False  # True si el axis se construyó sin años explícitos
 
     def __post_init__(self) -> None:
-        # Validaciones: rango, longitud, ausencia de '\n', tier_used ∈ enum
+        # Validaciones: rango, longitud, ausencia de '\n', tier_used ∈ enum,
+        # time_axis estrictamente creciente cuando no es None.
         ...
 ```
+
+El resolver ensambla `time_axis` ordenando los `time_point` retornados por los parsers, o calculando los midpoints (per ADR-0015) cuando solo hay `month_of_year`. Si no hay año explícito en ningún filename, se marca `calendar_agnostic=True` y se emite un warning.
 
 El mapeo a la clave canónica del schema es directo:
 - `ResolutionResult.frequency` → `DetectionResult.temporal_frequency`.
@@ -273,15 +291,43 @@ match N:
 
 Recibe el ganador y el dict de evidencia parcial. Si dos o más tiers no-null discrepan en `frequency`, retorna un nuevo `ResolutionResult` con el ganador intacto pero `source_evidence` prefijado por `WARN: <winner_tier>={X} > <other_tier>={Y}`. Esta es la implementación literal de REQ-008.
 
+### Algoritmo 6: construcción de `time_axis` (REQ-011, REQ-012, REQ-013)
+
+Pseudo-código de `_build_time_axis(parse_results, anchor, band_descriptions)`:
+
+```
+1. Si band_descriptions están disponibles y parsean ISO 8601 → usar como axis (REQ-013, fuente preferente).
+2. Para cada archivo del stack, invocar parsers en orden y obtener un ParseResult.
+3. Si el ParseResult retorna time_point → usarlo directamente.
+4. Si retorna month_of_year + year → construir datetime con el anchor configurado:
+     - midpoint (default, ADR-0015): día ≈ 15 (o ceil(mid_of_month)).
+     - start: día 1.
+     - end: último día calendárico del mes.
+     - custom: callable provisto por PipelineConfig.monthly_anchor_fn.
+5. Si retorna month_of_year sin year → construir con midpoint del mes en un
+   "año-plantilla" arbitrario (1970), marcar el axis como calendar_agnostic=True
+   y emitir warning `CALENDAR_AGNOSTIC: month-only encoding (no year present)`.
+6. Si retorna time_range (e.g. mensual con día implícito) → reducir al anchor.
+7. Ordenar el axis cronológicamente y deduplicar.
+8. Validar continuidad: los deltas observados deben coincidir con la frecuencia
+   inferida (tolerancia ±10% para frecuencias sub-diarias y mensuales).
+```
+
+**Precedencia de fuentes (REQ-013):** band descriptions ISO > filename parsing > inferencia pura por frecuencia. Esta precedencia es independiente de la jerarquía de tiers de frecuencia: aquí se trata del *eje concreto*, no de la frecuencia nominal.
+
+### Algoritmo 7: `MultiBandGeoTIFFBandDescriptionParser`
+
+Parser auxiliar especializado en modo A (multi-band GeoTIFF). Lee las descripciones de banda expuestas como `GDAL_BAND_DESCRIPTIONS` (ya extraídas por la Capa 1) e intenta parsear cada descripción como ISO 8601 (`YYYY-MM-DD`, `YYYY-MM-DDTHH:MM:SS`, etc.). Si todas las bandas parsean, retorna un `time_axis` directo y un `ParseResult` con `band_index` poblado por entrada. Si solo un subconjunto parsea, retorna `None` (no fallback parcial: degrada hacia filename parsing).
+
 ## 6. Parser catalog built-in
 
 Tabla de los cuatro parsers obligatorios (REQ-010). Las regex aquí son ilustrativas; la implementación final puede ser más permisiva siempre que pase la property test de NFR-002 (≥10 variantes por catálogo).
 
 | Parser | `name` | Regex (ilustrativa) | Frecuencia | Confidence |
 |---|---|---|---|---|
-| `WorldClimParser` | `worldclim` | `^wc2\.1_(?:30s\|2\.5m\|5m\|10m)_[a-z]+_(\d{2})\.tif$` | `MONTHLY` | 0.9 |
-| `ChelsaParser` | `chelsa` | `^CHELSA_[a-z]+_(\d{2})_\d{4}_V\.\d\.\d\.tif$` | `MONTHLY` | 0.9 |
-| `ChirpsParser` | `chirps` | `^chirps-v2\.0\.(\d{4})\.(\d{2})\.(\d{2})\.tif$` | `DAILY` | 0.9 |
+| `WorldClimParser` | `worldclim` | `^wc2\.1_(?:30s\|2\.5m\|5m\|10m)_[a-z]+_(?:(?P<year>\d{4})_)?(?P<month>\d{2})\.tif$` | `MONTHLY` | 0.9 |
+| `ChelsaParser` | `chelsa` | `^CHELSA_[a-z]+_(?P<year>\d{4})_(?P<month>\d{2})_V\.\d\.\d\.tif$` | `MONTHLY` | 0.9 |
+| `ChirpsParser` | `chirps` | `^chirps-v2\.0\.(?P<year>\d{4})\.(?P<month>\d{2})(?:\.(?P<day>\d{2}))?\.tif$` | `DAILY` (con `day`) / `MONTHLY` (sin `day`) | 0.9 |
 | `Era5Parser` | `era5` | `^era5_(?P<var>[a-z0-9_]+)_(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})_(?P<hour>\d{2})\.(nc\|tif)$` | `HOURLY` (con `hour`) / `DAILY` (sin `hour`) | 0.9 / 0.85 |
 
 `Era5Parser` usa cinco grupos nombrados (`var`, `year`, `month`, `day`, `hour`) y desambigua por la presencia del grupo `hour` en el match: si `hour` está capturado, la frecuencia es `HOURLY` con confidence `0.9`; si los nombres del set no incluyen la parte `_hh` (grupo `hour` ausente), el parser devuelve `frequency=DAILY` con confidence `0.85`. La regla "presencia/ausencia del grupo" sustituye la heurística previa basada en hora fija `_00.`, que era ambigua frente a regex con grupo posicional.
@@ -364,6 +410,16 @@ Tabla de los cuatro parsers obligatorios (REQ-010). Las regex aquí son ilustrat
 
 - `test_no_tty_raises_frequency_resolution_error` — entorno simulado sin callback inyectado y tiers no convergen → `FrequencyResolutionError`.
 
+### Tests de extracción de eje temporal (REQ-011, REQ-012, REQ-013)
+
+- `test_worldclim_extracts_month_only_axis_with_midpoint` — set canónico de 12 filenames WorldClim sin año → `time_axis` con 12 datetimes anclados al midpoint (día ≈15), `calendar_agnostic=True`, warning emitido.
+- `test_chelsa_extracts_year_month_axis` — set CHELSA con año explícito → `time_axis` con `year+month` y midpoint aplicado, `calendar_agnostic=False`.
+- `test_chirps_extracts_daily_axis` — set CHIRPS con `YYYY.MM.DD` → `time_axis` con fechas exactas, sin anchor (`monthly_anchor_applied=None`).
+- `test_era5_extracts_hourly_axis` — set ERA5 con grupo `hour` capturado → `time_axis` con resolución horaria.
+- `test_multiband_geotiff_band_description_axis` — modo A con `GDAL_BAND_DESCRIPTIONS` ISO 8601 → axis tomado de las bandas, filename parsing ignorado (REQ-013).
+- `test_monthly_anchor_override_start` — `PipelineConfig.monthly_anchor='start'` → todos los time points caen en día 1.
+- `test_calendar_agnostic_warning_when_no_year` — month-only sin año → warning con token `CALENDAR_AGNOSTIC`.
+
 ### Fixtures necesarios
 
 - `synthetic_cf_monthly.json` — dict con `time.units` y `time.calendar` para tier 1.
@@ -402,6 +458,10 @@ No aplica: feature greenfield. Las modificaciones colaterales (`StructureDetecto
 | REQ-008 | `_annotate_conflicts` + ordenamiento higher-wins en Algoritmo 1 |
 | REQ-009 | `FrequencyParserRegistry.register` + entry-point loader |
 | REQ-010 | `WorldClimParser`, `ChelsaParser`, `ChirpsParser`, `Era5Parser` § 6 |
+| REQ-011 | `ParseResult` (campos `time_point`, `month_of_year`, `year`) + `_build_time_axis` § Algoritmo 6 |
+| REQ-012 | `PipelineConfig.monthly_anchor` aplicado en pasos 4-5 del Algoritmo 6 |
+| REQ-013 | `MultiBandGeoTIFFBandDescriptionParser` § Algoritmo 7 + precedencia en paso 1 del Algoritmo 6 |
+| NFR (consistencia) | Validación de continuidad en paso 8 del Algoritmo 6 + tests de extracción de eje |
 | NFR-001 | benchmark `test_366_files_under_100ms` |
 | NFR-002 | property test `test_catalog_property_coverage` |
 | NFR-003 | `test_registry_accepts_external_parser`, `test_registry_entry_point_discovery` |

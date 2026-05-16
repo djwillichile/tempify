@@ -138,6 +138,16 @@ class PipelineConfig:
     # Solo aplica cuando dry_run=True. Pensado para `tempify inspect` que necesita
     # DetectionResult sin invocar la capa Validation.
     skip_pre_validation: bool = False
+    # Política de anchor temporal para valores agregados mensuales (ADR-0015).
+    # "midpoint" (default) coloca cada valor mensual en el centroide del periodo
+    # conforme a CF Conventions 7.4. "start"/"end" mueven el anchor al primer
+    # o último día del mes. "custom" requiere `custom_time_axis` explícito.
+    monthly_anchor: Literal["midpoint", "start", "end", "custom"] = "midpoint"
+    # Solo válido cuando monthly_anchor == "custom". Longitud debe coincidir
+    # con el número de slices temporales del input tras detect; la verificación
+    # de longitud se ejecuta en la fase 1b del pipeline (`run()`), no en
+    # __post_init__ (que no conoce N).
+    custom_time_axis: tuple[datetime, ...] | None = None
 ```
 
 **Invariantes verificadas en `__post_init__`:**
@@ -146,6 +156,7 @@ class PipelineConfig:
 - `progress_frequency_hz > 0`.
 - `method_options` se congela mediante `MappingProxyType` para preservar la inmutabilidad del dataclass.
 - `skip_pre_validation=True` requiere `dry_run=True`; caso contrario, `__post_init__` levanta `InvalidConfigError`. Cuando este flag está activo, el `ProcessingReport` resultante omite la sección "Validación pre" (los campos `validation_pre` quedan como lista vacía y el reporte Markdown no renderiza ese bloque).
+- `monthly_anchor == "custom"` requiere `custom_time_axis is not None`. Caso contrario, `__post_init__` levanta `InvalidConfigError` con `error_code="PIPELINE_INVALID_CONFIG_CUSTOM_ANCHOR_REQUIRES_AXIS"`. La verificación de que la longitud del axis coincide con el número de slices del input se realiza en la fase 1b de `run()` (donde N ya es conocido tras `detect`), levantando `PipelinePreValidationError` con `error_code="PIPELINE_CUSTOM_AXIS_LENGTH_MISMATCH"`. Inversamente, `custom_time_axis is not None` con `monthly_anchor != "custom"` también es inválido (`PIPELINE_INVALID_CONFIG_AXIS_WITHOUT_CUSTOM_ANCHOR`).
 
 ### `PipelineResult`
 
@@ -264,6 +275,15 @@ class ProcessingReport:
     errors: list[str]
     rymes_myers_iterations: int | None
     dry_run: bool
+    # Trazabilidad del ensamblaje de time_axis (ADR-0015).
+    monthly_anchor: Literal["midpoint", "start", "end", "custom"]
+    time_axis_source: Literal[
+        "cf-bounds",          # Tier 1: CF time:bounds extraído por io-handlers
+        "filename",           # Tier 2: nomenclatura de filenames (modo B/C)
+        "band-descriptions",  # Tier 2: GDAL_BAND_DESCRIPTIONS (modo A multibanda)
+        "midpoint-proxy",     # Fallback: año proxy 2026 + anchor (default)
+        "user-custom",        # Override de usuario con custom_time_axis
+    ]
 
 @dataclass(frozen=True, slots=True)
 class FileFingerprint:
@@ -302,6 +322,43 @@ def run(self, source: Path | list[Path]) -> PipelineResult:
                 _msg_es("PIPELINE_FREQUENCY_UNRESOLVED", e),
                 error_code="PIPELINE_FREQUENCY_UNRESOLVED",
             ) from e
+
+        # 1b. Ensamblar time_axis canónico (ADR-0015).
+        # El detector entrega un DetectionResult parcial donde time_axis
+        # puede venir del resolver (Tier 1 CF, Tier 2 nomenclatura, Tier 2
+        # band-descriptions) o ser None. Aquí el Pipeline materializa el
+        # axis final aplicando la política de anchor.
+        calendar_agnostic = False
+        if detection.resolution_result.time_axis is not None:
+            time_axis = detection.resolution_result.time_axis
+            time_bnds = _compute_time_bnds(
+                time_axis, detection.resolution_result.frequency
+            )
+            time_axis_source = detection.resolution_result.time_axis_source
+        elif cfg.monthly_anchor == "custom":
+            # Override explícito del usuario, ya validado en __post_init__.
+            time_axis = list(cfg.custom_time_axis)
+            time_bnds = _compute_time_bnds(time_axis, MONTHLY)
+            time_axis_source = "user-custom"
+        else:
+            # Sin extracción de fechas: usar año proxy (2026) con la
+            # convención de anchor solicitada (default = midpoint).
+            time_axis = TemporalAxis.from_months(
+                year=2026, anchor=cfg.monthly_anchor
+            ).to_list()
+            time_bnds = _compute_time_bnds(time_axis, MONTHLY)
+            calendar_agnostic = True
+            time_axis_source = "midpoint-proxy"
+
+        detection = detection.replace(
+            time_axis=time_axis,
+            time_bnds=time_bnds,
+            calendar_agnostic=calendar_agnostic,
+            monthly_anchor=cfg.monthly_anchor,
+        )
+        # `time_axis_source` se persiste en el ProcessingReport (ver §5
+        # Construcción del ProcessingReport, paso 4b).
+        self._time_axis_source = time_axis_source
         cb("detect", 1.0)
 
         # 2. validate_geospatial
@@ -447,6 +504,7 @@ def _build_dry_run_result(self, detection, geo_checks, compat_checks, stats_pre,
 2. Computa `md5_outputs` para cada output ya escrito (streaming hashlib sobre bytes en disco).
 3. Serializa `config` excluyendo callbacks (no son hash-estables) y sustituye `Path` por `str` POSIX.
 4. Resuelve `detection_confidence` desde `detection.confidence` (TypedDict ADR-0008).
+4b. Inyecta `monthly_anchor = cfg.monthly_anchor` y `time_axis_source = pipeline._time_axis_source` (poblado en fase 1b de `run()`, ver Algoritmo). Esto cierra la trazabilidad de qué política temporal materializó el axis (ADR-0015).
 5. Construye `warnings` y `errors` a partir de `validation.checks` (FAIL → error, WARN → warning).
 6. Establece `timestamp_utc = datetime.now(tz=UTC).isoformat()` **al final**, después de que cualquier hash haya quedado congelado.
 
@@ -479,6 +537,12 @@ Preserva el traceback original y el `error_code` de la capa inferior (REQ-009). 
 
 Per ADR-0007. El campo `timestamp_utc` se inyecta al final de `build()`, después de congelar los hashes; tests de reproducibilidad comparan MD5 ignorando ese campo.
 
+### Decisión 8: Ensamblaje de `time_axis` end-to-end (ADR-0015)
+
+El `time_axis` canónico que consume Interpolation y Validation se construye en el Pipeline, no en la Capa 2. La Capa 2 (`StructureDetector` + `TemporalFrequencyResolver`) provee los insumos: filenames ordenados, `band_descriptions` cuando aplica, y un `ResolutionResult.time_axis` opcional cuando alguno de los tiers logró extraer fechas reales. El Pipeline materializa el axis final aplicando la política de anchor (`cfg.monthly_anchor`) y, en ausencia de fechas, cae a un año proxy (2026) marcando `calendar_agnostic=True`. Esta decisión centraliza la política temporal en un único punto (la Capa 5) y mantiene a la Capa 2 libre de decisiones sobre convenciones CF, alineado con el principio "Capa 2 infiere, Capa 5 decide" y con la separación de responsabilidades de ADR-0015. La trazabilidad se preserva en `ProcessingReport.time_axis_source`, que distingue las cinco rutas posibles (`cf-bounds`, `filename`, `band-descriptions`, `midpoint-proxy`, `user-custom`).
+
+Referencia: ADR-0015 (Posicionamiento temporal de valores agregados — midpoint convention).
+
 ### Decisión 7: Modo combinado `dry_run=True` + `skip_pre_validation=True` para `tempify inspect`
 
 El subcomando CLI `tempify inspect` (ver `specs/cli/design.md` § "Algoritmo `inspect`") necesita exponer únicamente el `DetectionResult` sin invocar la capa Validation. Para evitar que el CLI importe `tempify.detection` directamente (lo cual violaría su REQ-012 de aislamiento de imports), el pipeline ofrece el modo combinado `dry_run=True, skip_pre_validation=True`. Bajo este modo, `run()` ejecuta solo `detect` + `generate_report` con `validation_pre=[]` y outputs vacíos. Cualquier otra combinación (`skip_pre_validation=True` con `dry_run=False`) está prohibida por la invariante declarada en Contratos y se rechaza en `__post_init__`. Esto extiende REQ-011 sin alterar el comportamiento por defecto (`skip_pre_validation=False`).
@@ -510,12 +574,22 @@ El subcomando CLI `tempify inspect` (ver `specs/cli/design.md` § "Algoritmo `in
 | `test_pipeline_skip_pre_validation_without_dry_run_raises` | REQ-011 (ampliado) |
 | `test_pipeline_invokes_frequency_resolver_callback` | REQ-012 |
 | `test_pipeline_raises_when_callback_returns_none` | REQ-012 |
+| `test_pipeline_propagates_time_axis_from_resolver` | ADR-0015, Decisión 8 |
+| `test_pipeline_falls_back_to_proxy_year_when_no_dates` | ADR-0015, Decisión 8 |
+| `test_pipeline_custom_monthly_anchor_requires_dates` | ADR-0015, Decisión 8 |
+| `test_processing_report_includes_time_axis_source` | ADR-0015, Decisión 8 |
 
 Especificación de los tres tests añadidos:
 
 - `test_pipeline_allclose_reproducibility_parallel`: construye `PipelineConfig(reproducibility_mode="parallel", scheduler="threaded", ...)` y ejecuta `run()` dos veces sobre el mismo `source`. Verifica `xr.testing.assert_allclose(out1, out2, rtol=1e-12, atol=1e-15)` sobre los `DataArray` resultantes (leídos desde los outputs escritos). Cubre la promesa de ADR-0007 para el modo `parallel`, complementaria al bit-exact del modo `strict`.
 - `test_pipeline_inspect_mode_skips_pre_validation`: ejecuta `run()` con `PipelineConfig(dry_run=True, skip_pre_validation=True, ...)` sobre un fixture cuyos archivos tienen CRS deliberadamente inconsistente. Verifica que el `PipelineResult.report.validation_pre` está vacío, que no se levanta `PipelinePreValidationError`, y que el `result.detection` está completamente poblado. Cubre el contrato consumido por el subcomando CLI `tempify inspect`.
 - `test_pipeline_skip_pre_validation_without_dry_run_raises`: construye `PipelineConfig(skip_pre_validation=True, dry_run=False, ...)` y verifica que `__post_init__` levanta `InvalidConfigError` con `error_code="PIPELINE_INVALID_CONFIG_SKIP_REQUIRES_DRY_RUN"`. Cubre la invariante declarada en la sección Contratos.
+- `test_pipeline_propagates_time_axis_from_resolver`: fixture NetCDF con `time:bounds` CF poblado (Tier 1 del resolver). Ejecuta `run()` y verifica que `result.detection.time_axis` corresponde al axis extraído por la Capa 2 (no al proxy 2026), que `result.detection.calendar_agnostic is False`, y que `result.report.time_axis_source == "cf-bounds"`. Variantes parametrizadas: filenames WorldClim-style (`"filename"`) y GeoTIFF multibanda con `GDAL_BAND_DESCRIPTIONS` parseables (`"band-descriptions"`).
+- `test_pipeline_falls_back_to_proxy_year_when_no_dates`: fixture de 12 GeoTIFF monocapa con nombres no parseables (`band_01.tif`..`band_12.tif`) y sin metadata CF. Ejecuta `run()` con `monthly_anchor="midpoint"`. Verifica que `result.detection.time_axis` corresponde a los midpoints de 2026, `result.detection.calendar_agnostic is True`, y `result.report.time_axis_source == "midpoint-proxy"`.
+- `test_pipeline_custom_monthly_anchor_requires_dates`: dos sub-casos.
+  (a) `PipelineConfig(monthly_anchor="custom", custom_time_axis=None)` falla en `__post_init__` con `InvalidConfigError(error_code="PIPELINE_INVALID_CONFIG_CUSTOM_ANCHOR_REQUIRES_AXIS")`.
+  (b) `PipelineConfig(monthly_anchor="custom", custom_time_axis=(11 datetimes,))` se construye OK, pero al ejecutar `run()` sobre un stack de 12 slices, la fase 1b levanta `PipelinePreValidationError(error_code="PIPELINE_CUSTOM_AXIS_LENGTH_MISMATCH")`.
+- `test_processing_report_includes_time_axis_source`: para cada uno de los cinco valores válidos del literal `time_axis_source` (`cf-bounds`, `filename`, `band-descriptions`, `midpoint-proxy`, `user-custom`), construye el fixture mínimo que dispare esa ruta, ejecuta `run()` y verifica que `result.report.time_axis_source` y `result.report.monthly_anchor` están correctamente poblados. Cubre la trazabilidad end-to-end de ADR-0015.
 
 ### Tests de imports prohibidos
 
@@ -590,6 +664,7 @@ No aplica: módulo nuevo, sin código previo en producción.
 - ADR-0008 — Confidence scoring and `DetectionResult` contract (shape del dict consumido por REQ-007).
 - ADR-0010 — Política unificada de tolerancia para conservación de la media mensual.
 - ADR-0014 — Corrección de naming `TempifyPipeline` (PascalCase).
+- ADR-0015 — Posicionamiento temporal de valores agregados (midpoint convention, `time_bnds`, override por usuario; consumido en fase 1b de `run()`).
 - `docs/schemas/processing-report.schema.md` — schema canónico del reporte.
 - `steering/architecture.md` § Capa 5 y reglas arquitectónicas duras.
 - Specs vecinas consumidas (todas Approved/Draft): `core-interpolation`, `io-handlers`, `validation`, `structure-detection`, `temporal-frequency-resolver`, `cli`.

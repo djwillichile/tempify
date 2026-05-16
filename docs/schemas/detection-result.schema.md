@@ -20,9 +20,10 @@ El contrato canónico de `confidence` está fijado en [ADR-0008](../adr/0008-con
 
 ```python
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from pathlib import Path
-from typing import TypedDict
+from typing import Literal, TypedDict
 
 
 class StructureMode(str, Enum):
@@ -78,7 +79,22 @@ class DetectionResult:
     files: list[Path]
     confidence: DetectionConfidence
     evidence: dict[str, str]              # Texto explicativo por tier (para reporte)
+    # Eje temporal canónico (ADR-0015). Ensamblado por el Pipeline tras la
+    # fase `detect`, no por la Capa 2 directamente; las layers productoras
+    # (StructureDetector, TemporalFrequencyResolver) entregan los inputs y
+    # el Pipeline materializa el axis final aquí.
+    time_axis: list["datetime"] | None = None
+    time_bnds: list[tuple["datetime", "datetime"]] | None = None
+    calendar_agnostic: bool = False
+    monthly_anchor: Literal["midpoint", "start", "end", "custom"] = "midpoint"
 ```
+
+#### Semántica de los nuevos campos (ADR-0015)
+
+- **`time_axis`:** lista de `datetime` correspondientes a cada paso temporal del stack, expresados en la convención **midpoint** del periodo de agregación por defecto (per ADR-0015 §1). Cuando `monthly_anchor != "midpoint"`, el axis sigue la convención indicada (`start`, `end` o `custom`). `None` solo durante la construcción intermedia: en el `DetectionResult` final que sale del Pipeline siempre está poblado.
+- **`time_bnds`:** lista de bounds `[first_day_of_period, first_day_of_next_period)` por paso, requerido para output CF con la variable auxiliar `time:bounds` (ADR-0015 §2). Longitud igual a `time_axis`.
+- **`calendar_agnostic`:** `True` cuando el axis se sintetizó sin información de año real (proxy 2026 u otro año testigo), típico de WorldClim y otros productos de climatología sin coordenada temporal explícita. Consumidores aguas abajo deben tratar el año del axis como simbólico.
+- **`monthly_anchor`:** la convención efectivamente aplicada al construir `time_axis`. Permite trazabilidad inversa: dado el `DetectionResult` se reconstruye qué política temporal materializó el axis.
 
 ### Mapeo con `architecture.md`
 
@@ -109,6 +125,8 @@ Reglas obligatorias que cualquier productor o consumidor del `DetectionResult` d
 7. **Separación datos / metadatos.** El dataclass NO contiene los `xr.DataArray`. Solo los `Path` y los metadatos de detección. Los datos se cargan después por la Capa 1 (IO handlers) cuando el pipeline los solicita explícitamente.
 
 8. **`temporal_frequency_tier` es etiqueta, no probabilidad.** A pesar de tener valores en `[0.0, 1.0]`, esta clave es un encoding numérico discreto del tier ganador, NO una probabilidad. No entra en la media ponderada de `overall` (ADR-0008, función `compute_overall_confidence`). Sus únicos valores válidos son `{1.0, 0.9, 0.7, 0.4}`.
+
+9. **Ensamblaje canónico de `time_axis` y `time_bnds`.** El Pipeline (Capa 5) ensambla `time_axis` y `time_bnds` a partir del `ResolutionResult` que produce la Capa 2 (`temporal-frequency-resolver`) y los stamps del propio `DetectionResult` (e.g. `band_descriptions` cuando es modo A multi-banda GeoTIFF, lista de filenames cuando es modo B/C). La Capa 2 no rellena estos campos por sí sola: el `StructureDetectionResult` y el `ResolutionResult` proporcionan los insumos, y el Pipeline materializa el axis final antes de pasar el `DetectionResult` completo a Validation e Interpolation. La política de anchor por defecto (`"midpoint"`) y el override por usuario están fijados en ADR-0015. Cuando el resolver no logra inferir años reales, el Pipeline aplica un año proxy (2026 por convención del módulo) y marca `calendar_agnostic=True`.
 
 ## Compatibilidad con xarray
 
@@ -155,6 +173,8 @@ Cualquier violación lanza `ValueError` con mensaje accionable indicando qué in
 
 - [ADR-0008](../adr/0008-confidence-scoring-and-detection-result-contract.md): Confidence scoring and DetectionResult contract (contrato canónico).
 - [ADR-0007](../adr/0007-reproducibility-policy.md): Política de reproducibilidad (justifica orden NFC y determinismo del cómputo).
+- [ADR-0015](../adr/0015-monthly-value-temporal-placement.md): Posicionamiento temporal de valores agregados (midpoint convention, `time_bnds`, override por usuario).
+- CF Conventions 7.4 (Climatological Statistics): https://cfconventions.org/Data/cf-conventions/cf-conventions-1.10/cf-conventions.html#climatological-statistics
 - `steering/architecture.md` § Capa 2 Detection.
 - `specs/structure-detection/requirements.md` REQ-006.
 - `specs/temporal-frequency-resolver/requirements.md` REQ-003.

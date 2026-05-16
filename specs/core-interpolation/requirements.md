@@ -9,6 +9,8 @@
 
 Implementar los cuatro métodos de interpolación temporal mensual → diaria (Lineal, PCHIP, PCHIP + Rymes-Myers mean-preserving, Fourier multi-armónico) validados experimentalmente sobre datos reales (Quinta Normal 2020) y sintéticos (stack 3×3). Esta spec es el corazón funcional del software; todas las demás specs orbitan alrededor de ella.
 
+El posicionamiento de los nodos de entrada sobre el eje temporal sigue la convención **midpoint** (punto medio canónico de cada mes calendario) per [ADR-0015](../../docs/adr/0015-monthly-value-temporal-placement.md). Esta convención preserva la semántica "valor mensual = promedio del mes" y evita el sesgo sistemático introducido por anchors de inicio/fin.
+
 ## 2. Alcance
 
 ### In-scope
@@ -103,6 +105,14 @@ IF the input stack has a non-Gregorian CF calendar (`noleap`, `360_day`, `julian
 
 IF the input stack has duplicate or non-contiguous month coordinates (e.g., `[1,3,4,...,12]` or `[1,1,2,...]`), THEN THE SYSTEM SHALL raise `InvalidMonthlyStackError` identifying the issue.
 
+### REQ-013 (Ubiquitous)
+
+THE SYSTEM SHALL position each monthly input value at the canonical midpoint of its calendar month (per ADR-0015) when constructing the X-coordinate axis for the smooth interpolators (Linear, PCHIP, Fourier). The PCHIP+Rymes-Myers mean-preserving algorithm operates on monthly aggregates and the midpoint convention applies only to the auxiliary node initialization of the iterator.
+
+### REQ-014 (Optional)
+
+WHERE the caller provides `monthly_anchor='start'`, `'end'`, or `'custom'` instead of the default `'midpoint'`, THE SYSTEM SHALL position monthly values at the requested anchor. With `'custom'`, the caller must additionally provide an explicit `time_axis: list[datetime]` of length 12 (or matching the input length).
+
 ## 5. Requisitos no funcionales
 
 | ID | Categoría | Requisito | Criterio verificable |
@@ -127,6 +137,8 @@ IF the input stack has duplicate or non-contiguous month coordinates (e.g., `[1,
 - [ ] REQ-010 cubierto por test `test_vectorized_with_dask`
 - [ ] REQ-011 cubierto por test `test_non_gregorian_calendar_raises`
 - [ ] REQ-012 cubierto por test `test_duplicate_or_noncontiguous_months_raises`
+- [ ] REQ-013 cubierto por tests `test_temporal_axis_midpoint_table`, `test_linear_input_nodes_at_midpoint`
+- [ ] REQ-014 cubierto por tests `test_monthly_anchor_start_shifts_nodes`, `test_custom_anchor_requires_explicit_dates`
 - [ ] NFR-001 medido y dentro del umbral
 - [ ] NFR-002 verificado con 100+ casos de hypothesis
 - [ ] NFR-003 verificado en ambos modos (`strict` y `parallel`) per ADR-0007
@@ -160,3 +172,5 @@ IF the input stack has duplicate or non-contiguous month coordinates (e.g., `[1,
 - Fritsch, F. N., & Carlson, R. E. (1980). Monotone piecewise cubic interpolation. *SIAM Journal on Numerical Analysis*, 17(2), 238-246.
 - Rymes, M. D., & Myers, D. R. (2001). Mean preserving algorithm for smoothly interpolating averaged data. *Solar Energy*, 71(4), 225-231.
 - Validación experimental previa: experimento Quinta Normal 2020 (ver `docs/methodology/empirical-validation-quinta-normal.md`).
+- [ADR-0015](../../docs/adr/0015-monthly-value-temporal-placement.md) — Convención midpoint para el posicionamiento temporal de valores mensuales.
+- CF Conventions §7.4 — Climatological statistics y semántica de celdas de tiempo (https://cfconventions.org/Data/cf-conventions/cf-conventions-1.11/cf-conventions.html#climatological-statistics).
