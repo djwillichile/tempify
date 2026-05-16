@@ -71,6 +71,33 @@ daily.to_netcdf("worldclim_daily.nc")
 
 Este repositorio sigue **Spec-Driven Development** y **Harness Engineering**. Toda implementación está precedida por una spec aprobada en `specs/`. Ver `CLAUDE.md` para el régimen de trabajo.
 
+## Ejemplo rápido (WorldClim Chile Central)
+
+Demo end-to-end sobre 12 GeoTIFFs sintéticos que reproducen la
+climatología real de temperatura media mensual de la Región
+Metropolitana de Santiago (≈21 °C verano, 9 °C invierno) con la
+convención de nombres de WorldClim v2.1.
+
+```bash
+# 1. Generar los archivos sinteticos (~50 KB, no requiere internet)
+python examples/generate_worldclim_sample.py
+
+# 2. Convertir mensual a diario via CLI
+tempify convert examples/data/worldclim_chile_central \
+    --method pchip_mp \
+    --year 2023 \
+    --output examples/out/cli \
+    --report examples/out/cli/report.md
+
+# 3. (opcional) Ejecutar el demo Python que verifica numericamente
+python examples/run_demo.py
+```
+
+Verifica end-to-end que: detección automática (mode B + climatological
+WorldClim), pipeline completo de 7 fases, NetCDF diario CF-compliant
+de salida, conservación de media mensual <1e-4 °C, y reporte de
+procedencia con MD5 de inputs. Ver `examples/README.md`.
+
 ## Estructura del repositorio
 
 ```

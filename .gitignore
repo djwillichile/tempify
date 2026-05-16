@@ -45,6 +45,8 @@ data/
 output/
 out/
 results/
+examples/data/
+examples/out/
 
 # Logs
 *.log
