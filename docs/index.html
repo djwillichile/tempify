@@ -276,6 +276,46 @@
     color: var(--title); display: block; margin-bottom: 4px; font-size: 13px;
   }
 
+  /* === CASO REAL (WorldClim Maipo) === */
+  #caso-real {
+    background: linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 100%);
+  }
+  .caso-fig {
+    margin: 22px 0 0;
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    overflow: hidden;
+    box-shadow: 0 8px 24px -16px rgba(13, 40, 84, 0.10);
+  }
+  .caso-fig img { width: 100%; height: auto; display: block; }
+  .caso-fig figcaption {
+    padding: 14px 20px;
+    font-size: 14px;
+    color: var(--text-muted);
+    background: var(--bg-card);
+    border-top: 1px solid var(--line-soft);
+  }
+  .caso-fig figcaption strong { color: var(--title); margin-right: 4px; }
+  .caso-fig figcaption code {
+    background: var(--bg-soft);
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 13px;
+    color: var(--icta-green-dark);
+  }
+  .caso-meta {
+    display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px;
+    font-size: 12px; color: var(--text-soft);
+  }
+  .caso-meta .chip {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 5px 12px;
+  }
+  .caso-meta .chip strong { color: var(--title); }
+
   /* === IMAGE DIVIDER === */
   .image-divider {
     position: relative;
@@ -564,6 +604,7 @@
     <div class="links">
       <a href="#how-it-works">¿Cómo funciona?</a>
       <a href="#metodos">Métodos</a>
+      <a href="#caso-real">Caso real</a>
       <a href="#quickstart">Quickstart</a>
       <a href="#tutorial">Tutorial</a>
       <a href="#roadmap">Próxima versión</a>
@@ -804,6 +845,40 @@
         </tbody>
       </table>
     </div>
+  </div>
+</section>
+
+<!-- ===================== CASO REAL (WorldClim Alto Maipo) ===================== -->
+<section id="caso-real">
+  <div class="container">
+    <h2>Caso real · <span class="grad">Alto Maipo, Chile</span></h2>
+    <p class="lede">
+      WorldClim v2.1 (climatología mensual 1970–2000, resolución 30 arc-sec ≈ 1 km) sobre la cuenca alta del río Maipo, Andes centrales de Chile. <strong>tempify</strong> acepta directamente el GeoTIFF multibanda de 12 capas (sin que haya que splittearlo) y produce 366 rásters diarios. Lo que ves abajo es el output literal del pipeline.
+    </p>
+
+    <div class="caso-meta">
+      <span class="chip">Bounding box · <strong>−71.0° a −69.8° lon, −34.1° a −33.0° lat</strong></span>
+      <span class="chip">Pixels · <strong>126 × 147</strong></span>
+      <span class="chip">Stack input · <strong>220 KB</strong></span>
+      <span class="chip">Output · <strong>366 días · 9.2 MB NetCDF</strong></span>
+      <span class="chip">Método · <code>pchip_mp</code></span>
+      <span class="chip">Range · <strong>−18.6 °C a +23.0 °C</strong></span>
+    </div>
+
+    <figure class="caso-fig">
+      <img src="assets/maipo_monthly_grid.jpg" alt="Grilla 3×4 con los 12 rásters mensuales de temperatura WorldClim sobre el Alto Maipo" loading="lazy" />
+      <figcaption><strong>Input mensual.</strong> Los 12 rásters climatológicos de WorldClim v2.1 (Ene–Dic). Azul profundo en alta cordillera invernal, rojo en valle estival. Es lo que entra al pipeline en un único <code>.tif</code> multibanda.</figcaption>
+    </figure>
+
+    <figure class="caso-fig">
+      <img src="assets/maipo_daily_strip.jpg" alt="Cuatro mapas diarios del output: 15 de Enero, Abril, Julio y Octubre 2024" loading="lazy" />
+      <figcaption><strong>Output diario.</strong> Cuatro fechas representativas del año 2024 generadas por <code>pchip_mp</code>. Misma paleta y escala que el input. Si recorrieras los 366 días verías la transición continua entre ellos.</figcaption>
+    </figure>
+
+    <figure class="caso-fig">
+      <img src="assets/maipo_pixel_timeseries.jpg" alt="Ciclo anual de temperatura para dos píxeles: valle del Maipo en rojo, alta cordillera en azul" loading="lazy" />
+      <figcaption><strong>Ciclo anual reconstruido.</strong> Series diarias en dos píxeles de altitud extrema. Los puntos son los 12 nodos mensuales del input — <code>pchip_mp</code> los preserva exactamente (media mensual conservada con error &lt; 10⁻⁴ °C).</figcaption>
+    </figure>
   </div>
 </section>
 
