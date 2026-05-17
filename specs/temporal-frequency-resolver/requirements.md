@@ -16,6 +16,7 @@ Inferir la frecuencia temporal de los datos de entrada siguiendo una jerarquía 
 - Lectura de metadatos CF-conventions (`time.units`, `time.calendar`) ya cargados por la Capa 1 (I/O).
 - Parsing de nomenclaturas conocidas mediante catálogo de parsers built-in: WorldClim, CHELSA, CHIRPS, ERA5.
 - Heurística por conteo de archivos (12 → mensual o climatológico, 365/366 → diario, 52 → semanal, 24 → horario, N años → anual).
+- Heurística por conteo de **bandas** cuando `N=1` y el input es un GeoTIFF multibanda: se aplica la misma tabla de conteo sobre `rasterio.open(path).count` (12 bandas → climatológico, 365/366 → diario, etc.). Permite al usuario pasar un único `.tif` multibanda sin tener que splittearlo en N archivos separados.
 - Resolución asistida por callback inyectado (CLI provee prompt interactivo; API permite inyectar callback explícito).
 - Enum normativo `TemporalFrequency` con valores `MONTHLY`, `DAILY`, `WEEKLY`, `CLIMATOLOGICAL`, `HOURLY`, `YEARLY` (alineado con `docs/schemas/detection-result.schema.md`).
 - Output explícito `ResolutionResult` dataclass con frecuencia, tier ganador, confianza y evidencia textual corta.
@@ -55,6 +56,10 @@ WHEN CF-conventions metadata (`time.units` and `time.calendar`) is present and p
 ### REQ-003 (Event-driven)
 
 WHEN a filename parser from the catalog matches with a regex score above 0.9, THE SYSTEM SHALL accept the parsed frequency, assign `tier_used = "nomenclature"` and cap the reported confidence at 0.9 per ADR-0008.
+
+### REQ-003b (Event-driven, multi-band fallback)
+
+WHEN the count-based heuristic (REQ-001 tier 3) cannot classify the input because `N=1` (a single file passed by the user) AND the file is a multi-band GeoTIFF whose `band` count maps unambiguously through the same canonical table (12 → climatological, 365/366 → daily, 52 → weekly, 24 → hourly), THE SYSTEM SHALL accept that mapping with `tier_used = "count_heuristic"` and the standard `confidence = 0.7`, emitting `source_evidence` mentioning the band count (e.g. `"heurística por bandas: 1 archivo con 12 bandas → climatological"`). This sub-heuristic SHALL NOT fire for single-band files (would be ambiguous).
 
 ### REQ-004a (State-driven, CLI)
 
@@ -137,6 +142,7 @@ Trazabilidad REQ → test (cada REQ tiene al menos un test nombrado en `tests/de
 - [ ] REQ-001 → `test_tier_cf_wins` (orden de tiers respetado)
 - [ ] REQ-002 → `test_tier_cf_wins` y `test_resolution_result_shape`
 - [ ] REQ-003 → `test_tier_worldclim_pattern_match`, `test_tier_chelsa_pattern_match`, `test_tier_chirps_pattern_match`, `test_tier_era5_pattern_match`
+- [x] REQ-003b → `test_band_count_heuristic_single_multiband_12_bands`, `test_band_count_heuristic_single_singleband_falls_through`
 - [ ] REQ-004a → `test_callback_invoked_when_ambiguous`
 - [ ] REQ-004b → `test_raises_when_no_callback_and_unknown`
 - [ ] REQ-005 → `test_user_override_skips_detection`

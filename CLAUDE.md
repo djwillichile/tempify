@@ -50,6 +50,7 @@ Este loop se repite por cada task. **No combinar tasks.**
 | [cli](specs/cli/requirements.md) | Approved | Interfaz de línea de comandos en español (Typer + Rich) |
 | [gui](specs/gui/requirements.md) | Approved | Interfaz gráfica de escritorio en español (PySide6) |
 | [packaging](specs/packaging/requirements.md) | Approved | Empaquetado para Windows (PyInstaller `--onedir` + Inno Setup) |
+| [security](specs/security/requirements.md) | Approved | Política de seguridad cross-cutting + canal de divulgación (`SECURITY.md`) |
 
 **Auditoría de Fase 1:** [specs/_audit/2026-05-16-requirements-audit.md](specs/_audit/2026-05-16-requirements-audit.md)
 **ADRs vigentes:** 0001 (xarray), 0002 (Dask), 0003 (Typer), 0004 (precipitación), 0005 (PySide6), 0006 (PyInstaller+Inno), 0007 (reproducibilidad), 0008 (confidence scoring), 0009 (tolerancias geo), 0010 (conservación de media), 0014 (`TempifyPipeline`).
