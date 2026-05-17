@@ -195,6 +195,11 @@ class TempifyPipeline:
             data = reader.read(path)
         else:
             data = MultiFileCollectionReader(concat_dim="month").read(list(files))
+        # Single multi-band GeoTIFF (mode A): rasterio reader emits dim "band".
+        # When it has 12 bands and no "month" dim, treat each band as a month
+        # so downstream interpolators see (month, y, x).
+        if "band" in data.dims and data.sizes["band"] == 12 and "month" not in data.dims:
+            data = data.rename({"band": "month"})
         # Normalize: ensure "month" is the leading dim with coord 1..12 when
         # we have exactly 12 steps; transpose so interpolators see (month, y, x).
         if "month" in data.dims and data.sizes["month"] == 12:

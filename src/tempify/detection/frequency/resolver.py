@@ -181,7 +181,30 @@ class TemporalFrequencyResolver:
                 source_evidence=(f"heurística por conteo: {n} archivos → {heuristic.value}"),
                 calendar_agnostic=True,
             )
-        evidence.append(f"conteo de archivos N={n} sin frecuencia canónica")
+
+        # Tier 3.b: band-count heuristic for a single multi-band file
+        if n == 1:
+            band_count = _probe_band_count(files_t[0])
+            if band_count is not None:
+                by_bands = _heuristic_frequency_from_count(band_count)
+                if by_bands is not None:
+                    return ResolutionResult(
+                        frequency=by_bands,
+                        tier_used=ResolutionTier.COUNT_HEURISTIC,
+                        confidence=TIER_BASE_CONFIDENCE[ResolutionTier.COUNT_HEURISTIC],
+                        source_evidence=(
+                            f"heurística por bandas: 1 archivo con {band_count} bandas → "
+                            f"{by_bands.value}"
+                        ),
+                        calendar_agnostic=True,
+                    )
+                evidence.append(
+                    f"archivo multibanda con {band_count} bandas (no canónico)"
+                )
+            else:
+                evidence.append(f"conteo de archivos N={n} sin frecuencia canónica")
+        else:
+            evidence.append(f"conteo de archivos N={n} sin frecuencia canónica")
 
         # Tier 4: interactive callback
         if self.callback is not None:
@@ -207,3 +230,16 @@ def _heuristic_frequency_from_count(n: int) -> TemporalFrequency | None:
     if n == 24:
         return TemporalFrequency.HOURLY
     return None
+
+
+def _probe_band_count(path: Path) -> int | None:
+    """Probe a raster file for its band count. Returns ``None`` if it cannot be opened."""
+    try:
+        import rasterio  # type: ignore[import-untyped]
+    except ImportError:
+        return None
+    try:
+        with rasterio.open(path) as src:
+            return int(src.count)
+    except Exception:
+        return None
