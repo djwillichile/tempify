@@ -1,0 +1,848 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>tempify — Densificación temporal para stacks ráster geoespaciales</title>
+<meta name="description" content="Convierte stacks ráster mensuales en series diarias preservando la media. Métodos: lineal, PCHIP, PCHIP+Rymes-Myers, Fourier. CLI y API Python. MIT. ICTA Ltda." />
+<meta property="og:title" content="tempify — Densificación temporal para stacks ráster geoespaciales" />
+<meta property="og:description" content="12 nodos mensuales → 365 valores diarios. Curva suave, media conservada, reproducible bit-exact." />
+<meta property="og:type" content="website" />
+<meta property="og:url" content="https://djwillichile.github.io/tempify/" />
+<meta property="og:image" content="https://djwillichile.github.io/tempify/assets/hero-stacks.jpg" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    /* Paleta ICTA digital */
+    --icta-green:        #16a34a;
+    --icta-green-dark:   #15803d;
+    --icta-green-light:  #22c55e;
+    --icta-teal:         #14b8a6;
+    --icta-cyan:         #22d3ee;
+    --icta-blue:         #1d4ed8;
+
+    /* Fondos */
+    --bg:          #f6faf8;
+    --bg-soft:     #eaf2ec;
+    --bg-card:    #ffffff;
+
+    /* Texto */
+    --title:       #0d2854;
+    --text:        #1f2a3e;
+    --text-muted:  #4a5b6b;
+    --text-soft:   #6b7888;
+
+    /* Líneas */
+    --line:        hsl(214 32% 91%);
+    --line-soft:   hsl(214 32% 96%);
+
+    /* Acentos de método del notebook (recalibrados para light theme) */
+    --m-linear:    #dc2626;
+    --m-pchip:     #2563eb;
+    --m-pchip-mp:  #059669;
+    --m-fourier:   #9333ea;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  code, pre, .mono { font-family: 'JetBrains Mono', 'SF Mono', Consolas, monospace; }
+  a { color: var(--icta-green-dark); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  ::selection { background: rgba(22, 163, 74, 0.18); }
+
+  .container { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+
+  /* === NAV === */
+  nav.top {
+    border-bottom: 1px solid var(--line);
+    background: rgba(246, 250, 248, 0.92);
+    backdrop-filter: blur(8px);
+    position: sticky; top: 0; z-index: 50;
+  }
+  nav.top .row {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 14px 0;
+  }
+  nav.top .brand {
+    font-weight: 800; font-size: 18px; color: var(--title);
+    letter-spacing: -0.01em;
+    display: flex; align-items: center; gap: 10px;
+  }
+  nav.top .brand .mark { width: 22px; height: 22px; }
+  nav.top .links { display: flex; gap: 22px; }
+  nav.top .links a { color: var(--text-muted); font-size: 14px; font-weight: 500; }
+  nav.top .links a:hover { color: var(--title); text-decoration: none; }
+  nav.top .links a.cta {
+    color: white;
+    background: var(--icta-green);
+    padding: 6px 12px; border-radius: 6px;
+  }
+  nav.top .links a.cta:hover { background: var(--icta-green-dark); }
+
+  /* === HERO (image-backed) === */
+  .hero {
+    position: relative;
+    overflow: hidden;
+    isolation: isolate;
+    background: var(--bg);
+  }
+  .hero::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(ellipse 900px 500px at 50% -20%, rgba(34, 197, 94, 0.10), transparent 70%),
+      radial-gradient(ellipse 600px 400px at 90% 30%, rgba(20, 184, 166, 0.06), transparent 70%);
+    z-index: -2;
+  }
+  .hero-bg {
+    position: absolute; inset: 0;
+    z-index: -1;
+    overflow: hidden;
+  }
+  .hero-bg img {
+    width: 100%; height: 100%;
+    object-fit: cover; object-position: center 60%;
+    opacity: 0.85;
+  }
+  .hero-bg::after {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      linear-gradient(180deg, rgba(246, 250, 248, 0.85) 0%, rgba(246, 250, 248, 0.55) 35%, rgba(246, 250, 248, 0.75) 100%),
+      linear-gradient(90deg, rgba(246, 250, 248, 0.95) 0%, rgba(246, 250, 248, 0.30) 50%, rgba(246, 250, 248, 0.65) 100%);
+  }
+  .hero-content {
+    padding: 96px 0 88px;
+    min-height: 540px;
+    display: flex; flex-direction: column; justify-content: center;
+    position: relative;
+  }
+  .hero .eyebrow {
+    color: var(--icta-green-dark); font-weight: 600; font-size: 13px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+    margin-bottom: 18px;
+    display: inline-flex; align-items: center; gap: 8px;
+    background: rgba(255, 255, 255, 0.7);
+    padding: 6px 14px;
+    border-radius: 999px;
+    width: fit-content;
+    border: 1px solid rgba(22, 163, 74, 0.18);
+  }
+  .hero .eyebrow .dot {
+    width: 6px; height: 6px; border-radius: 50%;
+    background: var(--icta-green);
+    box-shadow: 0 0 0 4px rgba(22, 163, 74, 0.18);
+  }
+  .hero h1 {
+    font-size: 60px; font-weight: 800; margin: 0 0 18px;
+    color: var(--title); letter-spacing: -0.025em; line-height: 1.04;
+    max-width: 800px;
+    text-shadow: 0 1px 0 rgba(255, 255, 255, 0.5);
+  }
+  .hero h1 .grad {
+    background: linear-gradient(135deg, var(--icta-green) 0%, var(--icta-teal) 50%, var(--icta-blue) 100%);
+    -webkit-background-clip: text; background-clip: text;
+    color: transparent;
+  }
+  .hero .subtitle {
+    font-size: 19px; color: var(--text);
+    max-width: 660px; margin: 0 0 32px;
+    font-weight: 500;
+    text-shadow: 0 1px 2px rgba(255, 255, 255, 0.7);
+  }
+
+  /* === CTAs === */
+  .cta-row { display: flex; flex-wrap: wrap; gap: 12px; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 12px 22px; border-radius: 8px;
+    font-weight: 600; font-size: 14px;
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+    border: 1px solid transparent;
+  }
+  .btn-primary {
+    background: linear-gradient(135deg, var(--icta-green) 0%, var(--icta-green-dark) 100%);
+    color: #f0fdf4;
+    box-shadow: 0 8px 24px -8px rgba(22, 163, 74, 0.45);
+  }
+  .btn-primary:hover { box-shadow: 0 12px 28px -8px rgba(22, 163, 74, 0.55); text-decoration: none; transform: translateY(-1px); }
+  .btn-secondary {
+    background: rgba(255, 255, 255, 0.92);
+    color: var(--title);
+    border-color: var(--line);
+    backdrop-filter: blur(4px);
+  }
+  .btn-secondary:hover { background: var(--bg-soft); text-decoration: none; }
+  .btn .arrow { transition: transform 0.15s ease; }
+  .btn:hover .arrow { transform: translateX(3px); }
+
+  /* === SECTIONS === */
+  section { padding: 64px 0; border-top: 1px solid var(--line); }
+  section h2 {
+    color: var(--title); font-size: 32px; font-weight: 700;
+    letter-spacing: -0.02em; margin: 0 0 12px;
+  }
+  section .lede {
+    color: var(--text-muted); font-size: 17px; max-width: 720px;
+    margin: 0 0 40px;
+  }
+  section h2 .grad {
+    background: linear-gradient(135deg, var(--icta-green), var(--icta-teal));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+
+  /* === "CÓMO FUNCIONA" === */
+  #how-it-works {
+    background:
+      linear-gradient(180deg, var(--bg) 0%, var(--bg-soft) 100%);
+  }
+  .how-visual {
+    background: var(--bg-card);
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: 0 12px 40px -16px rgba(13, 40, 84, 0.12);
+    position: relative;
+    overflow: hidden;
+  }
+  .how-visual .vlegend {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    margin-bottom: 8px; flex-wrap: wrap; gap: 12px;
+  }
+  .how-visual .vlegend .vtitle {
+    color: var(--title); font-weight: 700; font-size: 15px;
+    letter-spacing: -0.01em;
+  }
+  .how-visual .vlegend .vsub { color: var(--text-soft); font-size: 12px; }
+  .how-visual .vlegend .vkey { display: flex; gap: 18px; align-items: center; font-size: 12px; color: var(--text-muted); }
+  .how-visual .vlegend .vkey .kdot {
+    width: 10px; height: 10px; border-radius: 50%; margin-right: 6px;
+    vertical-align: middle; display: inline-block;
+  }
+  .how-visual svg {
+    width: 100%; height: auto; display: block;
+  }
+  .how-visual .vfoot {
+    display: flex; justify-content: space-between;
+    font-size: 11px; color: var(--text-soft);
+    margin-top: 4px; padding: 0 4px;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* === IMAGE DIVIDER === */
+  .image-divider {
+    position: relative;
+    height: 280px;
+    overflow: hidden;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .image-divider img {
+    width: 100%; height: 100%;
+    object-fit: cover; object-position: center;
+    display: block;
+  }
+  .image-divider::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      linear-gradient(180deg, var(--bg) 0%, transparent 20%, transparent 80%, var(--bg) 100%);
+    pointer-events: none;
+  }
+  .image-divider .caption {
+    position: absolute; bottom: 24px; left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.85);
+    backdrop-filter: blur(6px);
+    border: 1px solid var(--line);
+    border-radius: 999px;
+    padding: 8px 18px;
+    font-size: 13px;
+    color: var(--title);
+    font-weight: 600;
+    letter-spacing: -0.005em;
+    white-space: nowrap;
+  }
+  .image-divider .caption .accent {
+    color: var(--icta-green-dark);
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+  }
+
+  /* === FEATURE GRID === */
+  .features { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; }
+  .feature {
+    background: var(--bg-card); border: 1px solid var(--line);
+    border-radius: 14px; padding: 24px;
+    transition: border-color 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .feature:hover {
+    border-color: var(--icta-green-light);
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px -16px rgba(13, 40, 84, 0.12);
+  }
+  .feature .icon {
+    width: 42px; height: 42px; border-radius: 10px;
+    background: linear-gradient(135deg, rgba(34, 197, 94, 0.15), rgba(20, 184, 166, 0.15));
+    color: var(--icta-green-dark);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px; margin-bottom: 14px;
+  }
+  .feature h3 { color: var(--title); font-size: 17px; margin: 0 0 8px; font-weight: 600; }
+  .feature p { color: var(--text-muted); margin: 0; font-size: 14px; }
+
+  /* === METHODS TABLE === */
+  .methods {
+    background: var(--bg-card); border: 1px solid var(--line);
+    border-radius: 14px; overflow: hidden;
+    box-shadow: 0 8px 24px -16px rgba(13, 40, 84, 0.08);
+  }
+  table.methods-tbl { width: 100%; border-collapse: collapse; }
+  .methods-tbl th, .methods-tbl td {
+    padding: 14px 18px; text-align: left;
+    border-bottom: 1px solid var(--line-soft);
+  }
+  .methods-tbl th {
+    color: var(--text-soft); font-size: 11px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    background: var(--bg-soft);
+  }
+  .methods-tbl td { font-size: 14px; color: var(--text); }
+  .methods-tbl tr:last-child td { border-bottom: none; }
+  .methods-tbl tr.featured td {
+    background: linear-gradient(90deg, rgba(34, 197, 94, 0.07), rgba(20, 184, 166, 0.03));
+  }
+  .method-name {
+    display: inline-flex; align-items: center; gap: 10px;
+    font-family: 'JetBrains Mono', monospace; font-weight: 600;
+    color: var(--title);
+  }
+  .swatch-bar { width: 4px; height: 18px; border-radius: 2px; }
+  td.diff { font-family: 'JetBrains Mono', monospace; font-size: 13px; color: var(--text-muted); }
+  td.diff.best { color: var(--icta-green-dark); font-weight: 700; }
+
+  /* === QUICKSTART === */
+  .quickstart { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .qs-block {
+    background: var(--bg-card); border: 1px solid var(--line);
+    border-radius: 14px; padding: 22px;
+  }
+  .qs-block h4 {
+    color: var(--text-soft); font-size: 11px; margin: 0 0 12px;
+    font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  pre.code {
+    background: #0d2854; color: #d9e6f5; border-radius: 8px;
+    padding: 16px; overflow-x: auto; margin: 0;
+    font-size: 13px; line-height: 1.55;
+  }
+  pre.code .cmt { color: #7c96b8; }
+  pre.code .kw  { color: #c084fc; }
+  pre.code .str { color: #86efac; }
+  pre.code .fn  { color: #93c5fd; }
+  pre.code .num { color: #fbbf24; }
+  pre.code .pr  { color: var(--icta-green-light); user-select: none; }
+
+  /* === TUTORIAL CARD === */
+  .tutorial-card {
+    background:
+      linear-gradient(135deg, rgba(34, 197, 94, 0.06) 0%, rgba(34, 211, 238, 0.06) 50%, rgba(29, 78, 216, 0.06) 100%);
+    border: 1px solid var(--line);
+    border-radius: 16px; padding: 36px;
+    display: grid; grid-template-columns: 2fr 1fr; gap: 28px; align-items: center;
+  }
+  .tutorial-card h3 { margin: 0 0 12px; font-size: 22px; color: var(--title); font-weight: 700; }
+  .tutorial-card p { margin: 0 0 18px; color: var(--text-muted); }
+  .tutorial-card .stats { display: flex; gap: 24px; flex-wrap: wrap; margin: 18px 0; }
+  .stat .num {
+    display: block; font-size: 26px; font-weight: 800;
+    background: linear-gradient(135deg, var(--icta-green), var(--icta-teal));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .stat .lbl { font-size: 11px; color: var(--text-soft); letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; }
+
+  /* === ROADMAP === */
+  .roadmap {
+    background:
+      linear-gradient(135deg, rgba(20, 184, 166, 0.08), rgba(29, 78, 216, 0.06));
+    border: 1px solid rgba(29, 78, 216, 0.18);
+    border-radius: 16px; padding: 32px;
+  }
+  .roadmap .label {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--icta-cyan), var(--icta-blue));
+    color: #f0f9ff;
+    font-size: 11px; font-weight: 700;
+    padding: 5px 14px; border-radius: 999px;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .roadmap h2 { margin-top: 0; }
+  .roadmap-items { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-top: 24px; }
+  .roadmap-item {
+    background: var(--bg-card); border: 1px solid var(--line);
+    border-radius: 12px; padding: 20px;
+  }
+  .roadmap-item .icon { font-size: 24px; margin-bottom: 10px; }
+  .roadmap-item h4 { color: var(--title); font-size: 15px; margin: 0 0 6px; font-weight: 600; }
+  .roadmap-item p { color: var(--text-muted); font-size: 13px; margin: 0; }
+
+  /* === FOOTER === */
+  footer {
+    border-top: 1px solid var(--line);
+    padding: 48px 0 32px;
+    background: var(--bg-soft);
+  }
+  footer .grid { display: grid; grid-template-columns: 1.5fr 1fr 1fr 1fr; gap: 32px; }
+  footer h5 {
+    color: var(--title); font-size: 12px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    margin: 0 0 14px;
+  }
+  footer p, footer li, footer a { color: var(--text-muted); font-size: 14px; }
+  footer ul { list-style: none; padding: 0; margin: 0; }
+  footer ul li { margin-bottom: 8px; }
+  footer .copyright {
+    margin-top: 36px; padding-top: 24px;
+    border-top: 1px solid var(--line);
+    color: var(--text-soft); font-size: 13px;
+    display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  }
+  pre.bibtex {
+    background: var(--title); color: #d9e6f5; padding: 12px;
+    border-radius: 6px; font-size: 11px;
+    overflow-x: auto; margin-top: 10px;
+  }
+  pre.bibtex .k { color: var(--icta-green-light); }
+
+  /* === RESPONSIVE === */
+  @media (max-width: 760px) {
+    .hero-content { padding: 60px 0 60px; min-height: 460px; }
+    .hero h1 { font-size: 38px; }
+    .hero .subtitle { font-size: 16px; }
+    .image-divider { height: 180px; }
+    .quickstart, .tutorial-card { grid-template-columns: 1fr; }
+    .features { grid-template-columns: 1fr; }
+    .roadmap-items { grid-template-columns: 1fr; }
+    footer .grid { grid-template-columns: 1fr 1fr; }
+    nav.top .links { gap: 12px; }
+    nav.top .links a:not(.cta) { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="container row">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+        <defs>
+          <linearGradient id="m1" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+            <stop offset="0" stop-color="#16a34a"/>
+            <stop offset="1" stop-color="#1d4ed8"/>
+          </linearGradient>
+        </defs>
+        <path d="M2 18 C 6 6, 10 6, 12 12 S 18 18, 22 6" stroke="url(#m1)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+        <circle cx="6" cy="10" r="2" fill="#16a34a"/>
+        <circle cx="12" cy="12" r="2" fill="#14b8a6"/>
+        <circle cx="18" cy="14" r="2" fill="#1d4ed8"/>
+      </svg>
+      tempify
+    </div>
+    <div class="links">
+      <a href="#how-it-works">¿Cómo funciona?</a>
+      <a href="#metodos">Métodos</a>
+      <a href="#quickstart">Quickstart</a>
+      <a href="#tutorial">Tutorial</a>
+      <a href="#roadmap">v0.2.0</a>
+      <a class="cta" href="https://github.com/djwillichile/tempify">GitHub →</a>
+    </div>
+  </div>
+</nav>
+
+<!-- ===================== HERO ===================== -->
+<header class="hero">
+  <div class="hero-bg">
+    <img src="assets/hero-stacks.jpg" alt="Stacks ráster transparentes con gradiente de temperatura sobre paisaje de montañas" loading="eager" />
+  </div>
+  <div class="container hero-content">
+    <div class="eyebrow"><span class="dot"></span>v0.1.2 · Py 3.11+ · ICTA Ltda.</div>
+    <h1>Genera más datos<br />entre tus <span class="grad">datos existentes</span>.</h1>
+    <p class="subtitle">
+      <strong>tempify</strong> realiza densificación temporal sobre stacks ráster geoespaciales: convierte una serie mensual de 12 valores en una serie diaria de 365, preservando la media mensual con tolerancia &lt; 10⁻⁴ °C.
+    </p>
+    <div class="cta-row">
+      <a class="btn btn-primary" href="https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/01-getting-started.ipynb">Abrir tutorial en Colab <span class="arrow">→</span></a>
+      <a class="btn btn-secondary" href="https://github.com/djwillichile/tempify">Ver código en GitHub</a>
+      <a class="btn btn-secondary" href="https://github.com/djwillichile/tempify/releases/latest">Descargar release</a>
+    </div>
+  </div>
+</header>
+
+<!-- ===================== HOW IT WORKS (SVG curve) ===================== -->
+<section id="how-it-works">
+  <div class="container">
+    <h2><span class="grad">12 nodos mensuales</span> → 365 valores diarios</h2>
+    <p class="lede">
+      El análogo conceptual es la <strong>interpolación de fotogramas</strong> en video: igual que un algoritmo genera frames intermedios para un video más fluido, <strong>tempify</strong> genera valores temporales intermedios para un stack ráster más denso. Lo que ves abajo es una curva PCHIP real sobre la climatología observada de Santiago de Chile: 12 valores mensuales (puntos azules) reconstruyen los 365 días del año (curva).
+    </p>
+
+    <div class="how-visual" aria-label="Curva PCHIP de densificación temporal sobre climatología real de Santiago, Chile.">
+      <div class="vlegend">
+        <div>
+          <div class="vtitle">Climatología de temperatura · Santiago, Chile</div>
+          <div class="vsub">12 valores mensuales observados (puntos) reconstruyen 365 valores diarios continuos (curva). Método <span class="mono">pchip_mp</span>.</div>
+        </div>
+        <div class="vkey">
+          <span><span class="kdot" style="background:#0d2854"></span>nodo mensual (input)</span>
+          <span><span class="kdot" style="background:#16a34a"></span>serie diaria (output)</span>
+        </div>
+      </div>
+
+      <svg viewBox="0 0 1200 280" xmlns="http://www.w3.org/2000/svg" role="img">
+        <defs>
+          <linearGradient id="curveGrad" x1="0" y1="0" x2="1200" y2="0" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="#16a34a"/>
+            <stop offset="50%" stop-color="#14b8a6"/>
+            <stop offset="100%" stop-color="#1d4ed8"/>
+          </linearGradient>
+          <linearGradient id="fillGrad" x1="0" y1="0" x2="0" y2="280" gradientUnits="userSpaceOnUse">
+            <stop offset="0%" stop-color="rgba(22, 163, 74, 0.22)"/>
+            <stop offset="100%" stop-color="rgba(22, 163, 74, 0.0)"/>
+          </linearGradient>
+        </defs>
+
+        <g stroke="rgba(13, 40, 84, 0.06)" stroke-width="1">
+          <line x1="60" y1="30" x2="60" y2="230"/>
+          <line x1="150" y1="30" x2="150" y2="230"/>
+          <line x1="240" y1="30" x2="240" y2="230"/>
+          <line x1="330" y1="30" x2="330" y2="230"/>
+          <line x1="420" y1="30" x2="420" y2="230"/>
+          <line x1="510" y1="30" x2="510" y2="230"/>
+          <line x1="600" y1="30" x2="600" y2="230"/>
+          <line x1="690" y1="30" x2="690" y2="230"/>
+          <line x1="780" y1="30" x2="780" y2="230"/>
+          <line x1="870" y1="30" x2="870" y2="230"/>
+          <line x1="960" y1="30" x2="960" y2="230"/>
+          <line x1="1050" y1="30" x2="1050" y2="230"/>
+          <line x1="1140" y1="30" x2="1140" y2="230"/>
+        </g>
+        <g stroke="rgba(13, 40, 84, 0.05)" stroke-width="1" stroke-dasharray="2 4">
+          <line x1="60" y1="70" x2="1140" y2="70"/>
+          <line x1="60" y1="130" x2="1140" y2="130"/>
+          <line x1="60" y1="190" x2="1140" y2="190"/>
+        </g>
+        <g fill="#6b7888" font-family="JetBrains Mono, monospace" font-size="10">
+          <text x="46" y="34" text-anchor="end">23°</text>
+          <text x="46" y="74" text-anchor="end">19°</text>
+          <text x="46" y="134" text-anchor="end">15°</text>
+          <text x="46" y="194" text-anchor="end">11°</text>
+          <text x="46" y="234" text-anchor="end">7°</text>
+        </g>
+
+        <path d="M 60.0,55.5 L 63.0,55.3 L 65.9,55.1 L 68.9,54.9 L 71.9,54.8 L 74.8,54.7 L 77.8,54.6 L 80.8,54.6 L 83.7,54.6 L 86.7,54.6 L 89.7,54.6 L 92.6,54.7 L 95.6,54.8 L 98.6,54.9 L 101.5,55.0 L 104.5,55.2 L 107.5,55.3 L 110.4,55.5 L 113.4,55.8 L 116.4,56.0 L 119.3,56.3 L 122.3,56.6 L 125.3,56.9 L 128.2,57.2 L 131.2,57.5 L 134.2,57.9 L 137.1,58.2 L 140.1,58.6 L 143.1,59.0 L 146.0,59.4 L 149.0,59.9 L 152.0,60.3 L 154.9,60.8 L 157.9,61.2 L 160.9,61.7 L 163.8,62.2 L 166.8,62.7 L 169.8,63.2 L 172.7,63.7 L 175.7,64.2 L 178.7,64.8 L 181.6,65.3 L 184.6,65.8 L 187.6,66.4 L 190.5,66.9 L 193.5,67.5 L 196.5,68.1 L 199.5,68.7 L 202.4,69.3 L 205.4,70.0 L 208.4,70.7 L 211.3,71.5 L 214.3,72.3 L 217.3,73.1 L 220.2,73.9 L 223.2,74.7 L 226.2,75.6 L 229.1,76.5 L 232.1,77.4 L 235.1,78.4 L 238.0,79.3 L 241.0,80.3 L 244.0,81.3 L 246.9,82.3 L 249.9,83.3 L 252.9,84.3 L 255.8,85.3 L 258.8,86.3 L 261.8,87.3 L 264.7,88.4 L 267.7,89.4 L 270.7,90.4 L 273.6,91.5 L 276.6,92.5 L 279.6,93.5 L 282.5,94.6 L 285.5,95.7 L 288.5,96.8 L 291.4,97.9 L 294.4,99.0 L 297.4,100.2 L 300.3,101.3 L 303.3,102.5 L 306.3,103.7 L 309.2,104.9 L 312.2,106.1 L 315.2,107.4 L 318.1,108.6 L 321.1,109.8 L 324.1,111.1 L 327.0,112.3 L 330.0,113.6 L 333.0,114.9 L 335.9,116.1 L 338.9,117.4 L 341.9,118.7 L 344.8,120.0 L 347.8,121.2 L 350.8,122.5 L 353.7,123.8 L 356.7,125.0 L 359.7,126.3 L 362.6,127.5 L 365.6,128.8 L 368.6,130.0 L 371.5,131.2 L 374.5,132.5 L 377.5,133.7 L 380.4,134.9 L 383.4,136.2 L 386.4,137.4 L 389.3,138.7 L 392.3,139.9 L 395.3,141.2 L 398.2,142.5 L 401.2,143.7 L 404.2,145.0 L 407.1,146.2 L 410.1,147.5 L 413.1,148.8 L 416.0,150.0 L 419.0,151.3 L 422.0,152.5 L 424.9,153.8 L 427.9,155.0 L 430.9,156.3 L 433.8,157.6 L 436.8,158.8 L 439.8,160.1 L 442.7,161.3 L 445.7,162.6 L 448.7,163.8 L 451.6,165.0 L 454.6,166.3 L 457.6,167.5 L 460.5,168.8 L 463.5,170.1 L 466.5,171.5 L 469.5,172.9 L 472.4,174.4 L 475.4,176.0 L 478.4,177.5 L 481.3,179.1 L 484.3,180.7 L 487.3,182.3 L 490.2,183.9 L 493.2,185.6 L 496.2,187.1 L 499.1,188.7 L 502.1,190.3 L 505.1,191.8 L 508.0,193.2 L 511.0,194.6 L 514.0,196.0 L 516.9,197.3 L 519.9,198.5 L 522.9,199.6 L 525.8,200.7 L 528.8,201.6 L 531.8,202.5 L 534.7,203.2 L 537.7,203.8 L 540.7,204.3 L 543.6,204.7 L 546.6,204.9 L 549.6,205.0 L 552.5,205.0 L 555.5,205.0 L 558.5,205.0 L 561.4,205.0 L 564.4,205.0 L 567.4,205.0 L 570.3,205.0 L 573.3,205.0 L 576.3,205.0 L 579.2,205.0 L 582.2,205.0 L 585.2,205.0 L 588.1,205.0 L 591.1,205.0 L 594.1,205.0 L 597.0,205.0 L 600.0,205.0 L 603.0,205.0 L 605.9,205.0 L 608.9,205.0 L 611.9,205.0 L 614.8,205.0 L 617.8,205.0 L 620.8,205.0 L 623.7,205.0 L 626.7,205.0 L 629.7,205.0 L 632.6,205.0 L 635.6,205.0 L 638.6,205.0 L 641.5,205.0 L 644.5,204.9 L 647.5,204.8 L 650.4,204.7 L 653.4,204.5 L 656.4,204.3 L 659.3,204.0 L 662.3,203.8 L 665.3,203.4 L 668.2,203.1 L 671.2,202.7 L 674.2,202.4 L 677.1,202.0 L 680.1,201.5 L 683.1,201.1 L 686.0,200.6 L 689.0,200.1 L 692.0,199.6 L 694.9,199.1 L 697.9,198.6 L 700.9,198.0 L 703.8,197.5 L 706.8,196.9 L 709.8,196.4 L 712.7,195.8 L 715.7,195.3 L 718.7,194.7 L 721.6,194.1 L 724.6,193.6 L 727.6,193.0 L 730.5,192.5 L 733.5,191.9 L 736.5,191.4 L 739.5,190.7 L 742.4,190.1 L 745.4,189.4 L 748.4,188.7 L 751.3,188.0 L 754.3,187.3 L 757.3,186.5 L 760.2,185.7 L 763.2,184.9 L 766.2,184.1 L 769.1,183.2 L 772.1,182.4 L 775.1,181.5 L 778.0,180.7 L 781.0,179.8 L 784.0,178.9 L 786.9,178.0 L 789.9,177.1 L 792.9,176.2 L 795.8,175.3 L 798.8,174.4 L 801.8,173.5 L 804.7,172.6 L 807.7,171.8 L 810.7,170.9 L 813.6,170.0 L 816.6,169.2 L 819.6,168.3 L 822.5,167.5 L 825.5,166.7 L 828.5,165.9 L 831.4,165.1 L 834.4,164.3 L 837.4,163.5 L 840.3,162.7 L 843.3,161.9 L 846.3,161.1 L 849.2,160.3 L 852.2,159.6 L 855.2,158.8 L 858.1,158.0 L 861.1,157.2 L 864.1,156.4 L 867.0,155.6 L 870.0,154.8 L 873.0,154.0 L 875.9,153.2 L 878.9,152.4 L 881.9,151.5 L 884.8,150.7 L 887.8,149.8 L 890.8,149.0 L 893.7,148.1 L 896.7,147.2 L 899.7,146.3 L 902.6,145.4 L 905.6,144.4 L 908.6,143.5 L 911.5,142.5 L 914.5,141.5 L 917.5,140.5 L 920.4,139.4 L 923.4,138.3 L 926.4,137.3 L 929.3,136.1 L 932.3,135.0 L 935.3,133.8 L 938.2,132.7 L 941.2,131.5 L 944.2,130.3 L 947.1,129.0 L 950.1,127.8 L 953.1,126.6 L 956.0,125.3 L 959.0,124.1 L 962.0,122.8 L 964.9,121.5 L 967.9,120.2 L 970.9,119.0 L 973.8,117.7 L 976.8,116.4 L 979.8,115.1 L 982.7,113.8 L 985.7,112.5 L 988.7,111.3 L 991.6,110.0 L 994.6,108.7 L 997.6,107.5 L 1000.5,106.2 L 1003.5,105.0 L 1006.5,103.8 L 1009.5,102.5 L 1012.4,101.3 L 1015.4,100.1 L 1018.4,98.8 L 1021.3,97.6 L 1024.3,96.4 L 1027.3,95.1 L 1030.2,93.9 L 1033.2,92.6 L 1036.2,91.4 L 1039.1,90.1 L 1042.1,88.9 L 1045.1,87.7 L 1048.0,86.4 L 1051.0,85.1 L 1054.0,83.9 L 1056.9,82.6 L 1059.9,81.4 L 1062.9,80.1 L 1065.8,78.9 L 1068.8,77.6 L 1071.8,76.4 L 1074.7,75.1 L 1077.7,73.8 L 1080.7,72.6 L 1083.6,71.3 L 1086.6,70.0 L 1089.6,68.8 L 1092.5,67.5 L 1095.5,66.2 L 1098.5,65.0 L 1101.4,63.7 L 1104.4,62.4 L 1107.4,61.1 L 1110.3,59.9 L 1113.3,58.6 L 1116.3,57.3 L 1119.2,56.0 L 1122.2,54.7 L 1125.2,53.5 L 1128.1,52.2 L 1131.1,50.9 L 1134.1,49.6 L 1137.0,48.3 L 1140.0,47.0 L 1140 230 L 60 230 Z" fill="url(#fillGrad)"/>
+
+        <path d="M 60.0,55.5 L 63.0,55.3 L 65.9,55.1 L 68.9,54.9 L 71.9,54.8 L 74.8,54.7 L 77.8,54.6 L 80.8,54.6 L 83.7,54.6 L 86.7,54.6 L 89.7,54.6 L 92.6,54.7 L 95.6,54.8 L 98.6,54.9 L 101.5,55.0 L 104.5,55.2 L 107.5,55.3 L 110.4,55.5 L 113.4,55.8 L 116.4,56.0 L 119.3,56.3 L 122.3,56.6 L 125.3,56.9 L 128.2,57.2 L 131.2,57.5 L 134.2,57.9 L 137.1,58.2 L 140.1,58.6 L 143.1,59.0 L 146.0,59.4 L 149.0,59.9 L 152.0,60.3 L 154.9,60.8 L 157.9,61.2 L 160.9,61.7 L 163.8,62.2 L 166.8,62.7 L 169.8,63.2 L 172.7,63.7 L 175.7,64.2 L 178.7,64.8 L 181.6,65.3 L 184.6,65.8 L 187.6,66.4 L 190.5,66.9 L 193.5,67.5 L 196.5,68.1 L 199.5,68.7 L 202.4,69.3 L 205.4,70.0 L 208.4,70.7 L 211.3,71.5 L 214.3,72.3 L 217.3,73.1 L 220.2,73.9 L 223.2,74.7 L 226.2,75.6 L 229.1,76.5 L 232.1,77.4 L 235.1,78.4 L 238.0,79.3 L 241.0,80.3 L 244.0,81.3 L 246.9,82.3 L 249.9,83.3 L 252.9,84.3 L 255.8,85.3 L 258.8,86.3 L 261.8,87.3 L 264.7,88.4 L 267.7,89.4 L 270.7,90.4 L 273.6,91.5 L 276.6,92.5 L 279.6,93.5 L 282.5,94.6 L 285.5,95.7 L 288.5,96.8 L 291.4,97.9 L 294.4,99.0 L 297.4,100.2 L 300.3,101.3 L 303.3,102.5 L 306.3,103.7 L 309.2,104.9 L 312.2,106.1 L 315.2,107.4 L 318.1,108.6 L 321.1,109.8 L 324.1,111.1 L 327.0,112.3 L 330.0,113.6 L 333.0,114.9 L 335.9,116.1 L 338.9,117.4 L 341.9,118.7 L 344.8,120.0 L 347.8,121.2 L 350.8,122.5 L 353.7,123.8 L 356.7,125.0 L 359.7,126.3 L 362.6,127.5 L 365.6,128.8 L 368.6,130.0 L 371.5,131.2 L 374.5,132.5 L 377.5,133.7 L 380.4,134.9 L 383.4,136.2 L 386.4,137.4 L 389.3,138.7 L 392.3,139.9 L 395.3,141.2 L 398.2,142.5 L 401.2,143.7 L 404.2,145.0 L 407.1,146.2 L 410.1,147.5 L 413.1,148.8 L 416.0,150.0 L 419.0,151.3 L 422.0,152.5 L 424.9,153.8 L 427.9,155.0 L 430.9,156.3 L 433.8,157.6 L 436.8,158.8 L 439.8,160.1 L 442.7,161.3 L 445.7,162.6 L 448.7,163.8 L 451.6,165.0 L 454.6,166.3 L 457.6,167.5 L 460.5,168.8 L 463.5,170.1 L 466.5,171.5 L 469.5,172.9 L 472.4,174.4 L 475.4,176.0 L 478.4,177.5 L 481.3,179.1 L 484.3,180.7 L 487.3,182.3 L 490.2,183.9 L 493.2,185.6 L 496.2,187.1 L 499.1,188.7 L 502.1,190.3 L 505.1,191.8 L 508.0,193.2 L 511.0,194.6 L 514.0,196.0 L 516.9,197.3 L 519.9,198.5 L 522.9,199.6 L 525.8,200.7 L 528.8,201.6 L 531.8,202.5 L 534.7,203.2 L 537.7,203.8 L 540.7,204.3 L 543.6,204.7 L 546.6,204.9 L 549.6,205.0 L 552.5,205.0 L 555.5,205.0 L 558.5,205.0 L 561.4,205.0 L 564.4,205.0 L 567.4,205.0 L 570.3,205.0 L 573.3,205.0 L 576.3,205.0 L 579.2,205.0 L 582.2,205.0 L 585.2,205.0 L 588.1,205.0 L 591.1,205.0 L 594.1,205.0 L 597.0,205.0 L 600.0,205.0 L 603.0,205.0 L 605.9,205.0 L 608.9,205.0 L 611.9,205.0 L 614.8,205.0 L 617.8,205.0 L 620.8,205.0 L 623.7,205.0 L 626.7,205.0 L 629.7,205.0 L 632.6,205.0 L 635.6,205.0 L 638.6,205.0 L 641.5,205.0 L 644.5,204.9 L 647.5,204.8 L 650.4,204.7 L 653.4,204.5 L 656.4,204.3 L 659.3,204.0 L 662.3,203.8 L 665.3,203.4 L 668.2,203.1 L 671.2,202.7 L 674.2,202.4 L 677.1,202.0 L 680.1,201.5 L 683.1,201.1 L 686.0,200.6 L 689.0,200.1 L 692.0,199.6 L 694.9,199.1 L 697.9,198.6 L 700.9,198.0 L 703.8,197.5 L 706.8,196.9 L 709.8,196.4 L 712.7,195.8 L 715.7,195.3 L 718.7,194.7 L 721.6,194.1 L 724.6,193.6 L 727.6,193.0 L 730.5,192.5 L 733.5,191.9 L 736.5,191.4 L 739.5,190.7 L 742.4,190.1 L 745.4,189.4 L 748.4,188.7 L 751.3,188.0 L 754.3,187.3 L 757.3,186.5 L 760.2,185.7 L 763.2,184.9 L 766.2,184.1 L 769.1,183.2 L 772.1,182.4 L 775.1,181.5 L 778.0,180.7 L 781.0,179.8 L 784.0,178.9 L 786.9,178.0 L 789.9,177.1 L 792.9,176.2 L 795.8,175.3 L 798.8,174.4 L 801.8,173.5 L 804.7,172.6 L 807.7,171.8 L 810.7,170.9 L 813.6,170.0 L 816.6,169.2 L 819.6,168.3 L 822.5,167.5 L 825.5,166.7 L 828.5,165.9 L 831.4,165.1 L 834.4,164.3 L 837.4,163.5 L 840.3,162.7 L 843.3,161.9 L 846.3,161.1 L 849.2,160.3 L 852.2,159.6 L 855.2,158.8 L 858.1,158.0 L 861.1,157.2 L 864.1,156.4 L 867.0,155.6 L 870.0,154.8 L 873.0,154.0 L 875.9,153.2 L 878.9,152.4 L 881.9,151.5 L 884.8,150.7 L 887.8,149.8 L 890.8,149.0 L 893.7,148.1 L 896.7,147.2 L 899.7,146.3 L 902.6,145.4 L 905.6,144.4 L 908.6,143.5 L 911.5,142.5 L 914.5,141.5 L 917.5,140.5 L 920.4,139.4 L 923.4,138.3 L 926.4,137.3 L 929.3,136.1 L 932.3,135.0 L 935.3,133.8 L 938.2,132.7 L 941.2,131.5 L 944.2,130.3 L 947.1,129.0 L 950.1,127.8 L 953.1,126.6 L 956.0,125.3 L 959.0,124.1 L 962.0,122.8 L 964.9,121.5 L 967.9,120.2 L 970.9,119.0 L 973.8,117.7 L 976.8,116.4 L 979.8,115.1 L 982.7,113.8 L 985.7,112.5 L 988.7,111.3 L 991.6,110.0 L 994.6,108.7 L 997.6,107.5 L 1000.5,106.2 L 1003.5,105.0 L 1006.5,103.8 L 1009.5,102.5 L 1012.4,101.3 L 1015.4,100.1 L 1018.4,98.8 L 1021.3,97.6 L 1024.3,96.4 L 1027.3,95.1 L 1030.2,93.9 L 1033.2,92.6 L 1036.2,91.4 L 1039.1,90.1 L 1042.1,88.9 L 1045.1,87.7 L 1048.0,86.4 L 1051.0,85.1 L 1054.0,83.9 L 1056.9,82.6 L 1059.9,81.4 L 1062.9,80.1 L 1065.8,78.9 L 1068.8,77.6 L 1071.8,76.4 L 1074.7,75.1 L 1077.7,73.8 L 1080.7,72.6 L 1083.6,71.3 L 1086.6,70.0 L 1089.6,68.8 L 1092.5,67.5 L 1095.5,66.2 L 1098.5,65.0 L 1101.4,63.7 L 1104.4,62.4 L 1107.4,61.1 L 1110.3,59.9 L 1113.3,58.6 L 1116.3,57.3 L 1119.2,56.0 L 1122.2,54.7 L 1125.2,53.5 L 1128.1,52.2 L 1131.1,50.9 L 1134.1,49.6 L 1137.0,48.3 L 1140.0,47.0" fill="none" stroke="url(#curveGrad)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+
+        <g fill="#0d2854" stroke="#ffffff" stroke-width="2">
+          <circle cx="101.5" cy="55.0" r="6"/>
+          <circle cx="193.5" cy="67.5" r="6"/>
+          <circle cx="276.6" cy="92.5" r="6"/>
+          <circle cx="368.6" cy="130.0" r="6"/>
+          <circle cx="457.6" cy="167.5" r="6"/>
+          <circle cx="549.6" cy="205.0" r="6"/>
+          <circle cx="638.6" cy="205.0" r="6"/>
+          <circle cx="730.5" cy="192.5" r="6"/>
+          <circle cx="822.5" cy="167.5" r="6"/>
+          <circle cx="911.5" cy="142.5" r="6"/>
+          <circle cx="1003.5" cy="105.0" r="6"/>
+          <circle cx="1092.5" cy="67.5" r="6"/>
+        </g>
+
+        <line x1="60" y1="230" x2="1140" y2="230" stroke="#0d2854" stroke-width="1.5"/>
+
+        <g fill="#4a5b6b" font-family="JetBrains Mono, monospace" font-size="10" text-anchor="middle">
+          <text x="101.5" y="248">Ene</text>
+          <text x="193.5" y="248">Feb</text>
+          <text x="276.6" y="248">Mar</text>
+          <text x="368.6" y="248">Abr</text>
+          <text x="457.6" y="248">May</text>
+          <text x="549.6" y="248">Jun</text>
+          <text x="638.6" y="248">Jul</text>
+          <text x="730.5" y="248">Ago</text>
+          <text x="822.5" y="248">Sep</text>
+          <text x="911.5" y="248">Oct</text>
+          <text x="1003.5" y="248">Nov</text>
+          <text x="1092.5" y="248">Dic</text>
+        </g>
+      </svg>
+
+      <div class="vfoot">
+        <span>12 nodos · DOY 15, 46, 74, … (midpoint mensual)</span>
+        <span>365 valores · PCHIP + Rymes-Myers (mean-preserving)</span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== FEATURES ===================== -->
+<section id="features">
+  <div class="container">
+    <h2>Por qué importa</h2>
+    <p class="lede">
+      Muchos productos climáticos (WorldClim, CHELSA, CRU-TS, TerraClimate) se distribuyen mensuales, pero los modelos hidrológicos, bioclimáticos y agronómicos los necesitan diarios. <strong>tempify</strong> es la pieza que cierra ese hueco.
+    </p>
+    <div class="features">
+      <div class="feature">
+        <div class="icon">⚙</div>
+        <h3>Cuatro métodos validados</h3>
+        <p>Lineal, PCHIP, PCHIP+Rymes-Myers (mean-preserving), Fourier multi-armónico. Elegís según el tradeoff suavidad / fidelidad / costo.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">⚖</div>
+        <h3>Conservación de media</h3>
+        <p>El método <code>pchip_mp</code> garantiza que la media mensual del output diario reproduce la del input con error &lt; 10⁻⁴ °C (observado ~10⁻¹⁴).</p>
+      </div>
+      <div class="feature">
+        <div class="icon">🌐</div>
+        <h3>Parsers built-in</h3>
+        <p>Reconoce nomenclatura WorldClim, CHELSA, CHIRPS, ERA5. Lee GeoTIFF y NetCDF; escribe NetCDF CF-compliant, GeoTIFF y Zarr.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">🔬</div>
+        <h3>Reproducibilidad bit-exact</h3>
+        <p>Mismos inputs + parámetros = mismo output (MD5). Cada ejecución produce un <code>ProcessingReport</code> con procedencia completa.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">⌨</div>
+        <h3>CLI + API Python</h3>
+        <p>Cinco subcomandos en español (<code>convert</code>, <code>inspect</code>, <code>validate</code>, <code>profiles</code>, <code>version</code>). API estable basada en xarray + Dask.</p>
+      </div>
+      <div class="feature">
+        <div class="icon">📐</div>
+        <h3>Convenciones rigurosas</h3>
+        <p>CF Conventions §7.4 (midpoint anchor), climatological wraparound para continuidad Dic-Ene, política explícita de precipitación.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== IMAGE DIVIDER ===================== -->
+<div class="image-divider" role="presentation" aria-hidden="true">
+  <img src="assets/curve-separator.jpg" alt="" loading="lazy" />
+  <div class="caption">12 nodos mensuales · <span class="accent">365 valores diarios</span> · sobre la Cordillera de los Andes</div>
+</div>
+
+<!-- ===================== MÉTODOS ===================== -->
+<section id="metodos">
+  <div class="container">
+    <h2>Métodos y conservación de media</h2>
+    <p class="lede">
+      Métricas reales sobre el sample sintético WorldClim Chile Central (12 GeoTIFFs mensuales → 365 días). <code>max&nbsp;|diff|</code> es la peor discrepancia píxel-a-píxel entre la media mensual reconstruida desde el output diario y el input original.
+    </p>
+    <div class="methods">
+      <table class="methods-tbl">
+        <thead>
+          <tr><th>Método</th><th>Suavidad</th><th>Conservación de media</th><th>Costo</th><th>max&nbsp;|diff|</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><span class="method-name"><span class="swatch-bar" style="background:var(--m-linear)"></span>linear</span></td>
+            <td>C⁰</td><td>Aproximada</td><td>Bajo</td>
+            <td class="diff">5.58 × 10⁻¹ °C</td>
+          </tr>
+          <tr>
+            <td><span class="method-name"><span class="swatch-bar" style="background:var(--m-pchip)"></span>pchip</span></td>
+            <td>C¹ shape-preserving</td><td>Aproximada</td><td>Medio</td>
+            <td class="diff">3.23 × 10⁻¹ °C</td>
+          </tr>
+          <tr class="featured">
+            <td><span class="method-name"><span class="swatch-bar" style="background:var(--m-pchip-mp)"></span>pchip_mp</span></td>
+            <td>C¹ + Rymes-Myers</td><td><strong>Estricta &lt; 10⁻⁴ °C</strong></td><td>Alto</td>
+            <td class="diff best">1.42 × 10⁻¹⁴ °C</td>
+          </tr>
+          <tr>
+            <td><span class="method-name"><span class="swatch-bar" style="background:var(--m-fourier)"></span>fourier</span></td>
+            <td>C∞ paramétrica</td><td>Aproximada</td><td>Medio</td>
+            <td class="diff">8.32 × 10⁻¹ °C</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== QUICKSTART ===================== -->
+<section id="quickstart">
+  <div class="container">
+    <h2>Quickstart</h2>
+    <p class="lede">
+      Python 3.11+. Mientras subimos a PyPI, se instala desde el repo.
+    </p>
+    <div class="quickstart">
+      <div class="qs-block">
+        <h4>1. Instalación</h4>
+<pre class="code"><span class="cmt"># desde el repositorio</span>
+<span class="pr">$</span> pip install git+https://github.com/djwillichile/tempify.git
+
+<span class="cmt"># o, una vez clonado, en modo editable</span>
+<span class="pr">$</span> git clone https://github.com/djwillichile/tempify.git
+<span class="pr">$</span> cd tempify
+<span class="pr">$</span> pip install -e .</pre>
+      </div>
+      <div class="qs-block">
+        <h4>2. CLI</h4>
+<pre class="code"><span class="pr">$</span> tempify convert ./worldclim_chile/ \
+    --method pchip_mp \
+    --year <span class="num">2023</span> \
+    --output ./out/ \
+    --report ./out/report.md</pre>
+      </div>
+      <div class="qs-block">
+        <h4>3. API Python</h4>
+<pre class="code"><span class="kw">from</span> pathlib <span class="kw">import</span> Path
+<span class="kw">from</span> tempify.pipeline <span class="kw">import</span> PipelineConfig, TempifyPipeline
+
+cfg <span class="kw">=</span> <span class="fn">PipelineConfig</span>(
+    method<span class="kw">=</span><span class="str">"pchip_mp"</span>,
+    target_year<span class="kw">=</span><span class="num">2023</span>,
+    output_dir<span class="kw">=</span><span class="fn">Path</span>(<span class="str">"./out"</span>),
+)
+result <span class="kw">=</span> <span class="fn">TempifyPipeline</span>(cfg).<span class="fn">run</span>(<span class="fn">Path</span>(<span class="str">"./worldclim_chile/"</span>))
+<span class="fn">print</span>(result.outputs)        <span class="cmt"># NetCDF de 365 dias</span>
+<span class="fn">print</span>(result.report.method)  <span class="cmt"># 'pchip_mp'</span></pre>
+      </div>
+      <div class="qs-block">
+        <h4>4. Verificación end-to-end</h4>
+<pre class="code"><span class="cmt"># Genera un sample sintetico (~50 KB) y</span>
+<span class="cmt"># corre el pipeline con todos los metodos.</span>
+<span class="pr">$</span> python examples/generate_worldclim_sample.py
+<span class="pr">$</span> python examples/run_demo.py</pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== TUTORIAL ===================== -->
+<section id="tutorial">
+  <div class="container">
+    <h2>Tutorial en Google Colab</h2>
+    <p class="lede">
+      Notebook ejecutable que recorre la API pública end-to-end. Sin instalación local: arrancás directo desde el navegador.
+    </p>
+    <div class="tutorial-card">
+      <div>
+        <h3>01-getting-started.ipynb</h3>
+        <p>Quickstart con <code>pchip_mp</code> · Inspección del NetCDF de salida · Mapas diarios día por día · Línea de tiempo 3D con anclas mensuales destacadas · Comparación numérica de los 4 métodos · Renderizado del reporte de procedencia · Lectura crítica.</p>
+        <div class="stats">
+          <div class="stat"><span class="num">~3 min</span><span class="lbl">Tiempo de ejecución</span></div>
+          <div class="stat"><span class="num">34</span><span class="lbl">Celdas</span></div>
+          <div class="stat"><span class="num">241</span><span class="lbl">Tests pasando</span></div>
+        </div>
+      </div>
+      <div style="text-align: center;">
+        <a class="btn btn-primary" href="https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/01-getting-started.ipynb">Abrir en Colab <span class="arrow">→</span></a>
+        <div style="margin-top: 12px; font-size: 12px; color: var(--text-soft);">o <a href="https://github.com/djwillichile/tempify/blob/main/docs/tutorials/01-getting-started.ipynb">verlo en GitHub</a></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ===================== ROADMAP ===================== -->
+<section id="roadmap">
+  <div class="container">
+    <div class="roadmap">
+      <span class="label">Próxima versión · v0.2.0</span>
+      <h2 style="color: var(--title);">Aplicación de escritorio y ejecutable Windows</h2>
+      <p class="lede">
+        Estamos trabajando en un instalador para usuarios que no quieran tocar Python. Un solo doble-clic, ventana en español, drag & drop de carpetas.
+      </p>
+      <div class="roadmap-items">
+        <div class="roadmap-item">
+          <div class="icon">🖥</div>
+          <h4>GUI PySide6 en español</h4>
+          <p>Selector visual de método, vista previa de detección, progress bar conectado al pipeline, visor del reporte embebido.</p>
+        </div>
+        <div class="roadmap-item">
+          <div class="icon">📦</div>
+          <h4>Instalador Windows .exe</h4>
+          <p>PyInstaller <code>--onedir</code> + Inno Setup. Sin requerir Python preinstalado. Asociación opcional de extensiones <code>.nc</code> y <code>.tif</code>.</p>
+        </div>
+        <div class="roadmap-item">
+          <div class="icon">🧠</div>
+          <h4>Redes neuronales pre-entrenadas</h4>
+          <p>Integración de ClimaX / Pangu-Weather / FourCastNet bajo patrón híbrido (baseline clásico + refinamiento NN). Ver <a href="https://github.com/djwillichile/tempify/blob/main/docs/adr/0017-neural-interpolator-extensibility.md">ADR-0017</a>.</p>
+        </div>
+      </div>
+      <div style="margin-top: 28px;">
+        <a class="btn btn-primary" href="mailto:contacto@icta.cl?subject=Aviso%20v0.2.0%20tempify&body=Hola%2C%20me%20gustar%C3%ADa%20recibir%20un%20aviso%20cuando%20salga%20la%20versi%C3%B3n%20v0.2.0%20de%20tempify%20con%20la%20GUI%20de%20escritorio%20y%20el%20instalador%20Windows.">Avisarme cuando salga <span class="arrow">→</span></a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container">
+    <div class="grid">
+      <div>
+        <h5>tempify</h5>
+        <p style="font-size: 13px;">Densificación temporal de stacks ráster geoespaciales. Open-source bajo licencia MIT, desarrollado por <a href="https://icta.cl">ICTA Ltda.</a></p>
+        <pre class="bibtex"><span class="k">@software</span>{fuentes_jaque_tempify_2026,
+  author       = {Fuentes-Jaque, Guillermo S.},
+  orcid        = {0000-0002-7864-4899},
+  title        = {tempify: Temporal densification
+                 for geospatial raster stacks},
+  year         = {2026},
+  version      = {0.1.2},
+  organization = {ICTA Ltda.},
+  publisher    = {Zenodo},
+  url          = {https://github.com/djwillichile/tempify}
+}</pre>
+      </div>
+      <div>
+        <h5>Recursos</h5>
+        <ul>
+          <li><a href="https://github.com/djwillichile/tempify">Código (GitHub)</a></li>
+          <li><a href="https://github.com/djwillichile/tempify/releases">Releases</a></li>
+          <li><a href="https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/01-getting-started.ipynb">Tutorial Colab</a></li>
+          <li><a href="https://github.com/djwillichile/tempify/tree/main/docs/adr">ADRs</a></li>
+          <li><a href="https://github.com/djwillichile/tempify/tree/main/docs/methodology">Metodología</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Mantenedor</h5>
+        <ul>
+          <li><a href="https://orcid.org/0000-0002-7864-4899">Guillermo Fuentes-Jaque</a></li>
+          <li>ICTA Ltda. · USS</li>
+          <li>Universidad de Chile</li>
+        </ul>
+      </div>
+      <div>
+        <h5>Contacto · ICTA</h5>
+        <ul>
+          <li><a href="mailto:contacto@icta.cl">contacto@icta.cl</a></li>
+          <li><a href="https://icta.cl">icta.cl</a></li>
+          <li><a href="https://wa.me/56992924314">WhatsApp +56 9 9292 4314</a></li>
+          <li><a href="https://github.com/djwillichile/tempify/issues">Reportar un issue</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="copyright">
+      <span>© 2026 ICTA Ltda. · Santiago, Chile · MIT License</span>
+      <span>Esta página vive en <a href="https://djwillichile.github.io/tempify/">djwillichile.github.io/tempify</a></span>
+    </div>
+  </div>
+</footer>
+
+</body>
+</html>

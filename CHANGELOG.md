@@ -13,6 +13,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Empaquetado Windows (PyInstaller `--onedir` + Inno Setup) (deferred del v0.1.0).
 - Integración de redes neuronales pre-entrenadas (ClimaX, Pangu-Weather, FourCastNet) bajo patrón híbrido (clásico baseline + NN refinement). Ver [ADR-0017](docs/adr/0017-neural-interpolator-extensibility.md).
 
+## [0.1.2] — 2026-05-17
+
+Release de empaquetado, documentación y metadatos. Sin cambios funcionales en el código del paquete (`src/tempify/` queda byte-idéntico a v0.1.0/v0.1.1 más el bump de versión). El motivo principal de este release es:
+
+1. **Disparar el webhook de Zenodo** (activado tras v0.1.1 y antes de v0.1.2) para que mintee un DOI sobre un release válido.
+2. **Arreglar el `CITATION.cff`** que tenía un ORCID placeholder (`0000-0000-0000-0000`), causa de que Zenodo rechazara el ingest de v0.1.1.
+3. **Publicar la landing page** del proyecto en GitHub Pages (`docs/index.html`).
+
+### Added
+
+- `docs/index.html`: landing page en español con la paleta corporativa de ICTA digital (verde→teal→cyan→azul, fondo claro). Incluye hero con imagen de stacks ráster, visualización SVG inline de la curva PCHIP sobre la climatología real de Santiago (12 nodos mensuales → 365 valores diarios), tabla numérica de los 4 métodos, quickstart con código copy-paste, tarjeta del tutorial Colab, sección de roadmap v0.2.0 destacando el ejecutable Windows, footer con BibTeX y datos de contacto institucional. Servida desde GitHub Pages en `https://djwillichile.github.io/tempify/`.
+- `docs/assets/`: directorio para los assets visuales del landing.
+- `docs/.nojekyll`: para que GH Pages sirva el HTML directamente sin pasar por Jekyll.
+- Notebook tutorial: nueva celda 4.2.bis con la curva PCHIP del píxel central renderizada con la paleta ICTA (réplica matplotlib del SVG del landing).
+- Notebook tutorial: la sección 4.5 (línea de tiempo 3D) ahora muestra 4 anclas mensuales (Ene/Abr/Jul/Oct) marcadas en rojo + 3 días interpolados translúcidos a cada lado, en lugar de 10 días consecutivos. La separación entre grupos hace evidente el rol de las anclas como "puntos de referencia" entre los que `tempify` interpola.
+
+### Fixed
+
+- `CITATION.cff`: ORCID placeholder `0000-0000-0000-0000` reemplazado por el real (`0000-0002-7864-4899`); afiliación institucional canónica tomada del repo `geoia-bloom-huasco` (ICTA Ltda. + Universidad San Sebastián); campos `version` y `date-released` actualizados a `0.1.2` / `2026-05-17`. Verificado contra schema CFF 1.2.0 con `cffconvert --validate`.
+- `README.md`: nuevo bloque "Citar este software" con cita corta estilo APA + BibTeX expandido (nombre completo, ORCID, organization, version 0.1.2).
+
+### Changed
+
+- `src/tempify/__init__.py`: `__version__ = "0.1.1" -> "0.1.2"`.
+
 ## [0.1.1] — 2026-05-17
 
 Release de documentación. Sin cambios en el código de producción del paquete (`src/tempify/` queda idéntico a v0.1.0 más el bump de versión); todos los cambios están en `docs/tutorials/`.
