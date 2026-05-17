@@ -7,15 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- `docs/tutorials/01-getting-started.ipynb`: Colab notebook que recorre la API pública de `tempify` v0.1.0 end-to-end sobre el sample sintético WorldClim Chile Central. Demuestra los cuatro métodos de interpolación, la garantía de conservación de media de `pchip_mp`, y el reporte de procedencia. Reproducible en Google Colab vía badge "Open in Colab".
-
 ### Pendiente para v0.2.0
 
 - Capa 7 (GUI) basada en PySide6 (deferred del v0.1.0).
 - Empaquetado Windows (PyInstaller `--onedir` + Inno Setup) (deferred del v0.1.0).
 - Integración de redes neuronales pre-entrenadas (ClimaX, Pangu-Weather, FourCastNet) bajo patrón híbrido (clásico baseline + NN refinement). Ver [ADR-0017](docs/adr/0017-neural-interpolator-extensibility.md).
+
+## [0.1.1] — 2026-05-17
+
+Release de documentación. Sin cambios en el código de producción del paquete (`src/tempify/` queda idéntico a v0.1.0 más el bump de versión); todos los cambios están en `docs/tutorials/`.
+
+### Added
+
+- `docs/tutorials/01-getting-started.ipynb`: Colab notebook que recorre la API pública de `tempify` end-to-end sobre el sample sintético WorldClim Chile Central. Demuestra los cuatro métodos de interpolación, la garantía de conservación de media de `pchip_mp` (≤ 1e-4 °C, observado ~1e-14 °C en float64), y el reporte de procedencia. Reproducible en Google Colab vía badge "Open in Colab". Incluye:
+  - Quickstart con `pchip_mp`.
+  - Inspección del NetCDF de salida y grid 3×4 con un raster por mes.
+  - Línea de tiempo 3D con anclas mensuales destacadas para visualizar la interpolación entre nodos observados.
+  - Comparación numérica de los 4 métodos (tabla `max|diff|` + RMSE).
+  - Renderizado del `ProcessingReport` en Markdown y JSON.
+  - Lectura crítica (cuándo usar cada método, convención midpoint, climatological wraparound, política de precipitación).
+
+### Fixed
+
+- Notebook tutorial: corrección del slicing por píxel (`daily[:, 15, 15]` → `daily.isel(y=15, x=15)`); el writer NetCDF produce dims `(y, x, time)`, no `(time, y, x)`, por lo que la indexación posicional devolvía silenciosamente una columna espacial en vez de la serie temporal. Plots de Demo 1 y Demo 2 ahora muestran las 4 series diarias recorriendo el año completo.
+- Notebook tutorial: corrección del texto sobre `fourier` que afirmaba conservación de media "por construcción"; la métrica empírica (~0.83 °C con 3 armónicos) refuta esa afirmación. El markdown ahora dirige a `pchip_mp` cuando se requiere conservación estricta.
+- Notebook tutorial: celda de instalación cambiada de `subprocess.check_call` con `--quiet` (que ocultaba errores de pip en Colab) a la magic `%pip install` de IPython con output visible.
 
 ## [0.1.0] — 2026-05-16
 
