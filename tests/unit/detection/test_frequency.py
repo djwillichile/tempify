@@ -135,6 +135,44 @@ class TestResolver:
         assert result.tier_used == ResolutionTier.COUNT_HEURISTIC
         assert result.frequency == TemporalFrequency.DAILY
 
+    def test_band_count_heuristic_single_multiband_12_bands(self, tmp_path: Path) -> None:
+        """1 multi-band GeoTIFF with 12 bands → climatological (per ADR-0008)."""
+        import numpy as np
+        import rioxarray  # noqa: F401  registers the .rio accessor
+        import xarray as xr
+
+        stack = xr.DataArray(
+            np.random.default_rng(0).uniform(0.0, 25.0, size=(12, 10, 10)).astype("float32"),
+            dims=("band", "y", "x"),
+            coords={"y": np.linspace(-34, -33, 10), "x": np.linspace(-71, -70, 10)},
+        ).rio.write_crs("EPSG:4326")
+        path = tmp_path / "stack_12_bands.tif"
+        stack.rio.to_raster(path)
+
+        resolver = TemporalFrequencyResolver()
+        result = resolver.resolve([path])
+        assert result.tier_used == ResolutionTier.COUNT_HEURISTIC
+        assert result.frequency == TemporalFrequency.CLIMATOLOGICAL
+        assert "12 bandas" in result.source_evidence
+
+    def test_band_count_heuristic_single_singleband_falls_through(self, tmp_path: Path) -> None:
+        """1 single-band GeoTIFF must not be misclassified; falls to callback/raises."""
+        import numpy as np
+        import rioxarray  # noqa: F401
+        import xarray as xr
+
+        single = xr.DataArray(
+            np.zeros((10, 10), dtype="float32"),
+            dims=("y", "x"),
+            coords={"y": np.linspace(-34, -33, 10), "x": np.linspace(-71, -70, 10)},
+        ).rio.write_crs("EPSG:4326")
+        path = tmp_path / "single_band.tif"
+        single.rio.to_raster(path)
+
+        resolver = TemporalFrequencyResolver()
+        with pytest.raises(FrequencyResolutionError):
+            resolver.resolve([path])
+
     def test_callback_used_when_all_else_fails(self) -> None:
         called: list[TemporalFrequency] = []
 

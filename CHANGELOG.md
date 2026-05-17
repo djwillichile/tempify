@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `TemporalFrequencyResolver`: nueva sub-heurística Tier 3.b para inputs de **un solo archivo multibanda**. Cuando `N=1` y el `.tif` tiene 12 bandas, el resolver clasifica la frecuencia como `climatological` sin necesidad de que el usuario splittee el stack en 12 archivos separados. Probado con WorldClim v2.1 Alto Maipo (12 bandas, 126×147 px).
+- `TempifyPipeline._read`: renombrado automático de la dimensión `band` → `month` para multiband stacks de 12 capas, manteniendo compatibilidad con los flujos existentes (single GeoTIFF de 1 banda, multi-file collection).
+- 2 tests unitarios nuevos en `tests/unit/detection/test_frequency.py`: caso multibanda de 12 bandas (debe inferir climatological) y caso single-band (debe caer al callback/raise).
+- Sample WorldClim real en `examples/data/worldclim_maipo_alto/wc1_6_maipo_alto_tavg_stack.tif` (220 KB, Alto Maipo, Chile, EPSG:4326, 30s res). Demuestra que tempify acepta multibanda nativamente.
+
 ### Pendiente para v0.2.0
 
 - Capa 7 (GUI) basada en PySide6 (deferred del v0.1.0).
