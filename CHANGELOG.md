@@ -13,6 +13,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `TempifyPipeline._read`: renombrado automático de la dimensión `band` → `month` para multiband stacks de 12 capas, manteniendo compatibilidad con los flujos existentes (single GeoTIFF de 1 banda, multi-file collection).
 - 2 tests unitarios nuevos en `tests/unit/detection/test_frequency.py`: caso multibanda de 12 bandas (debe inferir climatological) y caso single-band (debe caer al callback/raise).
 - Sample WorldClim real en `examples/data/worldclim_maipo_alto/wc1_6_maipo_alto_tavg_stack.tif` (220 KB, Alto Maipo, Chile, EPSG:4326, 30s res). Demuestra que tempify acepta multibanda nativamente.
+- Segundo tutorial Colab en `docs/tutorials/02-real-worldclim-maipo.ipynb` (18 celdas, ~640 KB): caso real con WorldClim Alto Maipo, mapas mensuales del input, 4 fechas diarias representativas del output, ciclo anual cordillera vs valle. Demuestra el contraste altitudinal (−18 °C en alta cordillera invernal a +23 °C en valle estival).
+- **Política de seguridad**: `SECURITY.md` con canal de reporte privado (GitHub PVR + email institucional), versiones soportadas, SLAs de respuesta. Cumple REQ-SEC-001.
+- **Spec de seguridad**: `specs/security/requirements.md` con 10 REQs (REQ-SEC-001 a REQ-SEC-010) cubriendo divulgación responsable, prohibición de patrones unsafe, version consistency, notebook hygiene, governance files, CI gating, supply chain. Indexada en `CLAUDE.md`.
+- **Auditoría de seguridad**: `specs/_audit/2026-05-17-security-audit.md` con el reporte completo (0 críticos/altos, 3 MED, 6 LOW). 5 hallazgos ya corregidos en este release; 4 quedan tracked para v0.1.3 (CI, governance docs, tests/security/).
+
+### Fixed
+
+- **Drift de versión (H-001 de la auditoría):** `pyproject.toml` declaraba `version = "0.1.0"` mientras `__version__` ya estaba en `0.1.2`. Sincronizado a `0.1.2`. Ahora `pip show tempify`, `tempify.__version__`, `CITATION.cff::version` y el tag de release coinciden bit-exactamente con la versión archivada en Zenodo (DOI 10.5281/zenodo.20251750).
+- **Username del desarrollador filtrado en outputs cacheados** (H-004): sanitizadas 2 occurrences en `docs/tutorials/01-getting-started.ipynb` (paths `C:\Users\Guillermo\AppData\...` → `C:\Users\runner\AppData\...`).
 
 ### Pendiente para v0.2.0
 
