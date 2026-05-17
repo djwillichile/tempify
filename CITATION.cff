@@ -11,7 +11,7 @@ authors:
       Instituto de Ciencias y Tecnología Ambiental ICTA Ltda., Chile.
       Facultad de Ingeniería, Universidad San Sebastián, Chile.
       Magíster en Gestión Territorial de Recursos Naturales,
-      Ingeniero en Recursos Naturales Renovables.
+      Ingeniero en Recursos Naturales Renovables, Universidad de Chile.
       Científico de datos geoespaciales · Consultor ambiental · Docente universitario.
 contact:
   - name: "ICTA Ltda."
@@ -38,6 +38,11 @@ repository-code: "https://github.com/djwillichile/tempify"
 url: "https://djwillichile.github.io/tempify/"
 version: "0.1.2"
 date-released: "2026-05-17"
+doi: "10.5281/zenodo.20251750"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.20251750"
+    description: "Versión 0.1.2 archivada en Zenodo"
 references:
   - type: article
     authors:
