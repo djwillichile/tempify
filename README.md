@@ -7,7 +7,7 @@
 [![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)](https://github.com/djwillichile/tempify)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20251750.svg)](https://doi.org/10.5281/zenodo.20251750)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20259997.svg)](https://doi.org/10.5281/zenodo.20259997)
 
 
 ## ¿Qué es?
@@ -162,7 +162,7 @@ Para metadatos completos (autores, afiliación, ORCID, referencias bibliográfic
 
 ### Cita corta (recomendada)
 
-> Fuentes-Jaque, G. S. (2026). *tempify: Temporal densification for geospatial raster stacks* (v0.1.2) \[Software\]. ICTA Ltda. https://doi.org/10.5281/zenodo.20251750
+> Fuentes-Jaque, G. S. (2026). *tempify: Temporal densification for geospatial raster stacks* (v0.1.3) \[Software\]. ICTA Ltda. https://doi.org/10.5281/zenodo.20259997
 
 ### BibTeX
 
@@ -172,11 +172,11 @@ Para metadatos completos (autores, afiliación, ORCID, referencias bibliográfic
   orcid        = {0000-0002-7864-4899},
   title        = {{tempify}: Temporal densification for geospatial raster stacks},
   year         = {2026},
-  version      = {0.1.2},
+  version      = {0.1.3},
   organization = {ICTA Ltda.; Universidad San Sebastián; Universidad de Chile},
   publisher    = {Zenodo},
-  doi          = {10.5281/zenodo.20251750},
-  url          = {https://doi.org/10.5281/zenodo.20251750}
+  doi          = {10.5281/zenodo.20259997},
+  url          = {https://doi.org/10.5281/zenodo.20259997}
 }
 ```
 
