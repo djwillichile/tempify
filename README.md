@@ -160,15 +160,23 @@ MIT License. Ver `LICENSE`.
 
 ## Citar este software
 
-Para citar este software use la información del archivo [CITATION.cff](CITATION.cff). Tras el primer GitHub Release, Zenodo asigna automáticamente un DOI; actualice este bloque cuando esté disponible.
+Para metadatos completos (autores, afiliación, ORCID, referencias bibliográficas) ver [CITATION.cff](CITATION.cff). Una vez que Zenodo asigne un DOI tras este release, se reemplazará la línea correspondiente en el BibTeX de abajo.
+
+### Cita corta (recomendada)
+
+> Fuentes-Jaque, G. S. (2026). *tempify: Temporal densification for geospatial raster stacks* (v0.1.2) \[Software\]. ICTA Ltda. https://github.com/djwillichile/tempify
+
+### BibTeX
 
 ```bibtex
 @software{fuentes_jaque_tempify_2026,
-  author       = {Fuentes-Jaque, Guillermo},
+  author       = {Fuentes-Jaque, Guillermo S.},
+  orcid        = {0000-0002-7864-4899},
   title        = {{tempify}: Temporal densification for geospatial raster stacks},
-  year         = 2026,
+  year         = {2026},
+  version      = {0.1.2},
+  organization = {ICTA Ltda.; Universidad San Sebastián; Universidad de Chile},
   publisher    = {Zenodo},
-  version      = {0.1.0},
   doi          = {10.5281/zenodo.XXXXXXX},
   url          = {https://github.com/djwillichile/tempify}
 }
