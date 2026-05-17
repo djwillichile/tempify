@@ -7,27 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Added
-
-- `TemporalFrequencyResolver`: nueva sub-heurística Tier 3.b para inputs de **un solo archivo multibanda**. Cuando `N=1` y el `.tif` tiene 12 bandas, el resolver clasifica la frecuencia como `climatological` sin necesidad de que el usuario splittee el stack en 12 archivos separados. Probado con WorldClim v2.1 Alto Maipo (12 bandas, 126×147 px).
-- `TempifyPipeline._read`: renombrado automático de la dimensión `band` → `month` para multiband stacks de 12 capas, manteniendo compatibilidad con los flujos existentes (single GeoTIFF de 1 banda, multi-file collection).
-- 2 tests unitarios nuevos en `tests/unit/detection/test_frequency.py`: caso multibanda de 12 bandas (debe inferir climatological) y caso single-band (debe caer al callback/raise).
-- Sample WorldClim real en `examples/data/worldclim_maipo_alto/wc1_6_maipo_alto_tavg_stack.tif` (220 KB, Alto Maipo, Chile, EPSG:4326, 30s res). Demuestra que tempify acepta multibanda nativamente.
-- Segundo tutorial Colab en `docs/tutorials/02-real-worldclim-maipo.ipynb` (18 celdas, ~640 KB): caso real con WorldClim Alto Maipo, mapas mensuales del input, 4 fechas diarias representativas del output, ciclo anual cordillera vs valle. Demuestra el contraste altitudinal (−18 °C en alta cordillera invernal a +23 °C en valle estival).
-- **Política de seguridad**: `SECURITY.md` con canal de reporte privado (GitHub PVR + email institucional), versiones soportadas, SLAs de respuesta. Cumple REQ-SEC-001.
-- **Spec de seguridad**: `specs/security/requirements.md` con 10 REQs (REQ-SEC-001 a REQ-SEC-010) cubriendo divulgación responsable, prohibición de patrones unsafe, version consistency, notebook hygiene, governance files, CI gating, supply chain. Indexada en `CLAUDE.md`.
-- **Auditoría de seguridad**: `specs/_audit/2026-05-17-security-audit.md` con el reporte completo (0 críticos/altos, 3 MED, 6 LOW). 5 hallazgos ya corregidos en este release; 4 quedan tracked para v0.1.3 (CI, governance docs, tests/security/).
-
-### Fixed
-
-- **Drift de versión (H-001 de la auditoría):** `pyproject.toml` declaraba `version = "0.1.0"` mientras `__version__` ya estaba en `0.1.2`. Sincronizado a `0.1.2`. Ahora `pip show tempify`, `tempify.__version__`, `CITATION.cff::version` y el tag de release coinciden bit-exactamente con la versión archivada en Zenodo (DOI 10.5281/zenodo.20251750).
-- **Username del desarrollador filtrado en outputs cacheados** (H-004): sanitizadas 2 occurrences en `docs/tutorials/01-getting-started.ipynb` (paths `C:\Users\Guillermo\AppData\...` → `C:\Users\runner\AppData\...`).
-
 ### Pendiente para v0.2.0
 
 - Capa 7 (GUI) basada en PySide6 (deferred del v0.1.0).
 - Empaquetado Windows (PyInstaller `--onedir` + Inno Setup) (deferred del v0.1.0).
 - Integración de redes neuronales pre-entrenadas (ClimaX, Pangu-Weather, FourCastNet) bajo patrón híbrido (clásico baseline + NN refinement). Ver [ADR-0017](docs/adr/0017-neural-interpolator-extensibility.md).
+- Workflows GitHub Actions (`pytest + ruff + mypy + gitleaks`), Dependabot, CodeQL — REQ-SEC-008.
+- `CODE_OF_CONDUCT.md` y `CONTRIBUTING.md` — REQ-SEC-007.
+- Tests automáticos `tests/security/` para REQ-SEC-002 / -005 / -006.
+
+## [0.1.3] — 2026-05-17
+
+Release de soporte multibanda nativo + caso real WorldClim + auditoría de seguridad + gobernanza mínima del repositorio público.
+
+### Added
+
+- **Soporte multibanda nativo en el pipeline**: `TemporalFrequencyResolver` gana una nueva sub-heurística Tier 3.b. Cuando `N=1` y el `.tif` tiene 12 bandas, el resolver infiere `climatological` sin que el usuario tenga que splittear el stack en 12 archivos. `TempifyPipeline._read` renombra automáticamente la dim `band` → `month` para multiband stacks de 12 capas. La nueva REQ-003b queda documentada en `specs/temporal-frequency-resolver/requirements.md`.
+- 2 tests unitarios nuevos en `tests/unit/detection/test_frequency.py` cubriendo el caso multibanda de 12 bandas (debe inferir climatological) y el caso single-band (debe caer al callback/raise).
+- Sample WorldClim real en `examples/data/worldclim_maipo_alto/wc1_6_maipo_alto_tavg_stack.tif` (220 KB, Alto Maipo, Andes centrales de Chile, EPSG:4326, 30 arc-sec).
+- **Segundo tutorial Colab** en `docs/tutorials/02-real-worldclim-maipo.ipynb` (18 celdas, ~640 KB): demuestra el soporte multibanda end-to-end sobre datos reales, mapas mensuales, 4 fechas diarias representativas, ciclo cordillera vs valle (−18 °C a +23 °C).
+- **Landing page: nueva sección "Caso real · Alto Maipo, Chile"** entre Métodos y Quickstart, con 3 figuras (input mensual / output diario / ciclo anual cordillera-vs-valle) y chips de metadatos. Las 3 figuras totalizan 213 KB en `docs/assets/`. Nav item "Caso real" agregado.
+- **Política de seguridad**: `SECURITY.md` con canal de reporte privado (GitHub PVR + email institucional), versiones soportadas, SLAs de respuesta. Cumple REQ-SEC-001.
+- **Spec de seguridad**: `specs/security/requirements.md` con 10 REQs (REQ-SEC-001 a REQ-SEC-010) cubriendo divulgación responsable, prohibición de patrones unsafe, version consistency, notebook hygiene, governance files, CI gating, supply chain. Indexada en `CLAUDE.md`.
+- **Reporte de auditoría**: `specs/_audit/2026-05-17-security-audit.md` con el resultado completo (0 críticos, 0 altos, 3 MED, 6 LOW). 5 hallazgos cerrados en este release; 4 quedan tracked para v0.2.0.
+
+### Fixed
+
+- **Drift de versión (H-001):** `pyproject.toml` declaraba `version = "0.1.0"` mientras `__version__` ya era `0.1.2`. Sincronizado a `0.1.3` en este release. Ahora `pip show tempify`, `tempify.__version__`, `CITATION.cff::version` y el tag de release coinciden bit-exactamente.
+- **Username del desarrollador filtrado en outputs cacheados (H-004):** sanitizadas 2 occurrences en `docs/tutorials/01-getting-started.ipynb`.
+
+### Changed
+
+- `src/tempify/__init__.py`: `__version__ "0.1.2" -> "0.1.3"`.
+- `pyproject.toml`: `version "0.1.0" -> "0.1.3"` (alineado).
+- `CITATION.cff`: `version "0.1.2" -> "0.1.3"`.
 
 ## [0.1.2] — 2026-05-17
 
