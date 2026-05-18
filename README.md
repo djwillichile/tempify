@@ -18,16 +18,27 @@ Análogo conceptual: igual que la **interpolación de fotogramas** genera frames
 
 ## ¿Para qué sirve?
 
-Numerosos productos geoespaciales se distribuyen a frecuencia mensual o climatológica (WorldClim, CHELSA, TerraClimate, CRU-TS), pero múltiples aplicaciones requieren resolución diaria:
+Los principales productos climáticos globales de alta resolución espacial — WorldClim (Fick & Hijmans, 2017), CHELSA (Karger et al., 2017), TerraClimate (Abatzoglou et al., 2018) y CRU-TS (Harris et al., 2020) — se distribuyen a frecuencia mensual o climatológica. Sin embargo, múltiples procesos ambientales dependen de manera **no lineal** de la variación subdiaría o diaria de las variables climáticas, lo que hace que los valores mensuales sean insuficientes como input directo.
 
-- Cálculo de grados-día (GDD)
-- Modelos de evapotranspiración (Hargreaves-Samani, Penman-Monteith)
-- Índices bioclimáticos derivados
-- Modelos hidrológicos distribuidos
-- Modelos de distribución de especies (SDM) con cubiertas climáticas diarias
-- Modelación regional de calidad del aire
+### Grados-día de desarrollo (GDD)
 
-`tempify` automatiza esa conversión con métodos validados experimentalmente y trazabilidad metodológica completa.
+El acumulado de grados-día es el índice fenológico más usado en agronomía y ecología: integra temperatura sobre un umbral base diariamente (McMaster & Wilhelm, 1997). Calcularlo desde medias mensuales introduce un sesgo sistemático porque la función umbral (max(T − T_base, 0)) es no lineal — interpolar valores intermedios antes de aplicar el umbral produce resultados distintos a aplicarlo sobre la media mensual directamente.
+
+### Evapotranspiración de referencia (ET₀)
+
+La ecuación de Penman-Monteith FAO-56 (Allen et al., 1998) — estándar internacional para ET₀ — requiere Tmax, Tmin y Tmean **diarios** para calcular el déficit de presión de vapor y la radiación neta. La ecuación simplificada de Hargreaves-Samani (Hargreaves & Samani, 1985), usada cuando solo hay temperatura, también opera sobre el rango térmico diario (Tmax − Tmin). Usar temperaturas mensuales directas subestima la amplitud térmica y por tanto la demanda evapotranspirativa.
+
+### Modelos de distribución de especies (SDM)
+
+Los modelos de distribución de especies requieren variables bioclimáticas derivadas de series diarias (e.g., temperatura del trimestre más cálido, precipitación del mes más seco). Hijmans & Graham (2006) demostraron que la resolución temporal del dato climático de entrada afecta significativamente la capacidad predictiva de los SDMs, especialmente en zonas con marcada estacionalidad.
+
+### Otros campos de aplicación
+
+- **Hidrología distribuida:** cómputo de balance hídrico diario y crecidas (modelos tipo SCS-CN, HBV, VIC).
+- **Índices bioclimáticos CHELSA/WorldClim:** requieren Tmax/Tmin diario para BIO5 (máx. del mes más cálido) y BIO6 (mín. del mes más frío).
+- **Calidad del aire regional:** modelos de dispersión fotooxidativa con forzante meteorológico diario.
+
+`tempify` automatiza esta conversión mensual → diaria con métodos validados y trazabilidad metodológica completa, preservando la media mensual original como restricción dura.
 
 ## ¿Qué no es?
 
@@ -192,11 +203,27 @@ Cooley, J. W., & Tukey, J. W. (1965). An algorithm for the machine calculation o
 
 Lai, L. O., & Kaplan, J. O. (2022). A fast mean-preserving spline for interpolating interval data. *Journal of Atmospheric and Oceanic Technology*, *39*(4), 503–512. https://doi.org/10.1175/JTECH-D-21-0154.1
 
-> **Sobre datasets de referencia.** Si usás datos WorldClim para validar tu pipeline, citá también:
->
-> Fick, S. E., & Hijmans, R. J. (2017). WorldClim 2: New 1-km spatial resolution climate surfaces for global land areas. *International Journal of Climatology*, *37*(12), 4302–4315. https://doi.org/10.1002/joc.5086
->
-> El stack `examples/data/worldclim_maipo_alto/` que distribuimos es un recorte derivado de ese producto.
+> **Sobre datasets de referencia.** El stack `examples/data/worldclim_maipo_alto/` que distribuimos es un recorte derivado de WorldClim v2.1. Si lo usás en publicaciones, citá el producto original.
+
+### Datasets de entrada citados en la documentación
+
+Fick, S. E., & Hijmans, R. J. (2017). WorldClim 2: New 1-km spatial resolution climate surfaces for global land areas. *International Journal of Climatology*, *37*(12), 4302–4315. https://doi.org/10.1002/joc.5086
+
+Karger, D. N., Conrad, O., Böhner, J., Kawohl, T., Kreft, H., Soria-Auza, R. W., Zimmermann, N. E., Linder, H. P., & Kessler, M. (2017). Climatologies at high resolution for the earth's land surface areas (CHELSA). *Scientific Data*, *4*, 170122. https://doi.org/10.1038/sdata.2017.122
+
+Abatzoglou, J. T., Dobrowski, S. Z., Parks, S. A., & Hegewisch, K. C. (2018). TerraClimate, a high-resolution global dataset of monthly climate and climatic water balance from 1958–2015. *Scientific Data*, *5*, 170191. https://doi.org/10.1038/sdata.2017.191
+
+Harris, I., Osborn, T. J., Jones, P., & Lister, D. (2020). Version 4 of the CRU TS monthly high-resolution gridded multivariate climate dataset. *Scientific Data*, *7*, 109. https://doi.org/10.1038/s41597-020-0453-3
+
+### Bases científicas de los casos de uso
+
+Allen, R. G., Pereira, L. S., Raes, D., & Smith, M. (1998). *Crop evapotranspiration: Guidelines for computing crop water requirements* (FAO Irrigation and Drainage Paper 56). FAO.
+
+Hargreaves, G. H., & Samani, Z. A. (1985). Reference crop evapotranspiration from temperature. *Applied Engineering in Agriculture*, *1*(2), 96–99. https://doi.org/10.13031/2013.26773
+
+McMaster, G. S., & Wilhelm, W. W. (1997). Growing degree-days: One equation, two interpretations. *Agricultural and Forest Meteorology*, *87*(4), 291–300. https://doi.org/10.1016/S0168-1923(97)00027-0
+
+Hijmans, R. J., & Graham, C. H. (2006). The ability of climate envelope models to predict the effect of climate change on species distributions. *Global Change Biology*, *12*(12), 2272–2281. https://doi.org/10.1111/j.1365-2486.2006.01256.x
 
 ## Contacto
 
