@@ -15,6 +15,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Ver [ADR-0018](docs/adr/0018-classical-interpolator-catalog.md) para el roadmap completo.
 
+## [0.1.5] — 2026-05-18
+
+Release de experiencia de usuario para notebooks y tutoriales. Sin cambios en el
+nucleo metodologico ni en los metodos de interpolacion existentes.
+
+### Added
+
+- **`tempify.datasets`**: modulo nuevo para datos sinteticos reproducibles tipo WorldClim.
+  - `create_worldclim_like_sample()` — genera 12 GeoTIFFs con nomenclatura WorldClim v2.1;
+    superficie espacial realista (gradiente altitudinal Andes, clusters gaussianos, textura
+    suavizada, ruido local). Reproducible via `seed`. Idempotente via `overwrite=False`.
+  - `read_monthly_stack()` — carga 12 GeoTIFFs mensuales como `xr.DataArray (month=12, y, x)`.
+  - `SANTIAGO_MONTHLY_TAVG` — climatologia de temperatura mensual para Santiago de Chile.
+- **`tempify.utils`**: helpers para cargar y filtrar outputs del pipeline.
+  - `open_tempify_output()` — abre el output de `TempifyPipeline.run()` detectando el formato
+    automaticamente (`.nc`, `.tif`, `.zarr`). Acepta `PipelineResult` o `Path`.
+  - `extract_daily_rasters()` — filtra un `DataArray` diario por meses, dias y/o ano.
+  - `get_anchor_dates()` — retorna las 12 fechas ancla mensuales (dia 15) para un ano.
+  - `raster_info()` — imprime resumen del DataArray estilo `terra::print(r)`: dimensiones,
+    resolucion, extension, CRS, capas o rango temporal, tipo de datos.
+- **`tempify.plotting`**: visualizaciones livianas para notebooks (matplotlib opcional).
+  - `plot_monthly_rasters()` — grilla 3x4 de los 12 GeoTIFFs mensuales con colorbar compartida.
+  - `plot_raster_timeseries()` — serie temporal de un pixel con scatter de anclas opcionales.
+  - `plot_temporal_stack_3d()` — stack raster 3D; anclas con borde rojo, interpoladas con
+    menor opacidad.
+- **Dependencia opcional `[viz]`**: `pip install tempify[viz]` agrega `matplotlib>=3.8`.
+- **Tutorial actualizado**: `docs/tutorials/01-getting-started.ipynb` — de ~800 lineas de
+  boilerplate a ~60 lineas de llamadas API (-760 lineas).
+
 ## [0.1.4] — 2026-05-18
 
 Release de extensión del catálogo de interpoladores: dos métodos clásicos nuevos (akima, cubic) per [ADR-0018](docs/adr/0018-classical-interpolator-catalog.md). Sin breaking changes; los 4 métodos existentes (`linear`, `pchip`, `pchip_mp`, `fourier`) siguen byte-idénticos a v0.1.3.

@@ -6,4 +6,4 @@ daily) while preserving statistical properties such as monthly mean
 conservation.
 """
 
-__version__ = "0.1.4"
+__version__ = "0.1.5"
