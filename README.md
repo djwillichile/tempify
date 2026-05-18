@@ -161,112 +161,42 @@ MIT License. Ver `LICENSE`.
 
 ## Citar este software
 
-Para metadatos completos (autores, afiliación, ORCID, referencias bibliográficas) ver [CITATION.cff](CITATION.cff). Una vez que Zenodo asigne un DOI tras este release, se reemplazará la línea correspondiente en el BibTeX de abajo.
+Para metadatos completos (autores, afiliación, ORCID) ver [CITATION.cff](CITATION.cff). Todas las entradas BibTeX están en [`REFERENCES.bib`](REFERENCES.bib).
 
-### Cita corta (recomendada)
-
-> Fuentes-Jaque, G. S. (2026). *tempify: Temporal densification for geospatial raster stacks* (v0.1.4) \[Software\]. ICTA Ltda. https://doi.org/10.5281/zenodo.20265222
-
-### BibTeX
-
-```bibtex
-@software{fuentes_jaque_tempify_2026,
-  author       = {Fuentes-Jaque, Guillermo S.},
-  orcid        = {0000-0002-7864-4899},
-  title        = {{tempify}: Temporal densification for geospatial raster stacks},
-  year         = {2026},
-  version      = {0.1.4},
-  organization = {ICTA Ltda.; Universidad San Sebastián; Universidad de Chile},
-  publisher    = {Zenodo},
-  doi          = {10.5281/zenodo.20265222},
-  url          = {https://doi.org/10.5281/zenodo.20265222}
-}
-```
+> Fuentes-Jaque, G. S. (2026). *tempify: Temporal densification for geospatial raster stacks* (v0.1.5) \[Software\]. ICTA Ltda.; Universidad San Sebastián; Universidad de Chile. https://doi.org/10.5281/zenodo.20265222
 
 ## Referencias bibliográficas de los métodos
 
-Las publicaciones originales detrás de cada método de interpolación que `tempify` implementa. Si usás un método específico en una publicación científica, citá también el paper correspondiente (no solo el paquete). Todas las revistas están indexadas en Web of Science / JCR.
+Las publicaciones originales detrás de cada método de interpolación que `tempify` implementa. Si usás un método específico en una publicación científica, citá también el paper correspondiente (no solo el paquete). Todas las revistas están indexadas en Web of Science / JCR. Entradas BibTeX en [`REFERENCES.bib`](REFERENCES.bib).
 
-| Método | Paper / libro fundacional | DOI |
-|---|---|---|
-| `pchip`, `pchip_mp` (base) | Fritsch & Carlson 1980 — SIAM J. Numer. Anal. | [10.1137/0717021](https://doi.org/10.1137/0717021) |
-| `pchip_mp` (corrección) | Rymes & Myers 2001 — Solar Energy | [10.1016/S0038-092X(01)00052-4](https://doi.org/10.1016/S0038-092X(01)00052-4) |
-| `akima` | Akima 1970 — J. ACM | [10.1145/321607.321609](https://doi.org/10.1145/321607.321609) |
-| `cubic` | de Boor 1978 — *A Practical Guide to Splines*, Springer | ISBN 978-0-387-95366-3 |
-| `fourier` | Cooley & Tukey 1965 — Math. Comp. (FFT) | [10.1090/S0025-5718-1965-0178586-1](https://doi.org/10.1090/S0025-5718-1965-0178586-1) |
-| _v0.2.0_ `cubic_mp_lai_kaplan` | Lai & Kaplan 2022 — J. Atmos. Oceanic Tech. | [10.1175/JTECH-D-21-0154.1](https://doi.org/10.1175/JTECH-D-21-0154.1) |
+| Método | Clave BibTeX |
+|--------|-------------|
+| `pchip`, `pchip_mp` (base) | `fritsch_carlson_1980` |
+| `pchip_mp` (corrección media) | `rymes_myers_2001` |
+| `akima` | `akima_1970` |
+| `cubic` | `deboor_1978` |
+| `fourier` | `cooley_tukey_1965` |
+| _v0.2.0_ `cubic_mp_lai_kaplan` | `lai_kaplan_2022` |
 
-### BibTeX listo para copiar
+### En formato APA
 
-```bibtex
-@article{fritsch_carlson_1980,
-  author  = {Fritsch, F. N. and Carlson, R. E.},
-  title   = {Monotone Piecewise Cubic Interpolation},
-  journal = {SIAM Journal on Numerical Analysis},
-  volume  = {17},
-  number  = {2},
-  pages   = {238--246},
-  year    = {1980},
-  doi     = {10.1137/0717021}
-}
+Fritsch, F. N., & Carlson, R. E. (1980). Monotone piecewise cubic interpolation. *SIAM Journal on Numerical Analysis*, *17*(2), 238–246. https://doi.org/10.1137/0717021
 
-@article{rymes_myers_2001,
-  author  = {Rymes, M. D. and Myers, D. R.},
-  title   = {Mean Preserving Algorithm for Smoothly Interpolating Averaged Data},
-  journal = {Solar Energy},
-  volume  = {71},
-  number  = {4},
-  pages   = {225--231},
-  year    = {2001},
-  doi     = {10.1016/S0038-092X(01)00052-4}
-}
+Rymes, M. D., & Myers, D. R. (2001). Mean preserving algorithm for smoothly interpolating averaged data. *Solar Energy*, *71*(4), 225–231. https://doi.org/10.1016/S0038-092X(01)00052-4
 
-@article{akima_1970,
-  author  = {Akima, Hiroshi},
-  title   = {A New Method of Interpolation and Smooth Curve Fitting Based on Local Procedures},
-  journal = {Journal of the ACM},
-  volume  = {17},
-  number  = {4},
-  pages   = {589--602},
-  year    = {1970},
-  doi     = {10.1145/321607.321609}
-}
+Akima, H. (1970). A new method of interpolation and smooth curve fitting based on local procedures. *Journal of the ACM*, *17*(4), 589–602. https://doi.org/10.1145/321607.321609
 
-@book{deboor_1978,
-  author    = {de Boor, Carl},
-  title     = {A Practical Guide to Splines},
-  series    = {Applied Mathematical Sciences},
-  volume    = {27},
-  publisher = {Springer-Verlag},
-  address   = {New York},
-  year      = {1978},
-  isbn      = {978-0-387-95366-3}
-}
+de Boor, C. (1978). *A practical guide to splines* (Vol. 27, Applied Mathematical Sciences). Springer-Verlag.
 
-@article{cooley_tukey_1965,
-  author  = {Cooley, James W. and Tukey, John W.},
-  title   = {An Algorithm for the Machine Calculation of Complex Fourier Series},
-  journal = {Mathematics of Computation},
-  volume  = {19},
-  number  = {90},
-  pages   = {297--301},
-  year    = {1965},
-  doi     = {10.1090/S0025-5718-1965-0178586-1}
-}
+Cooley, J. W., & Tukey, J. W. (1965). An algorithm for the machine calculation of complex Fourier series. *Mathematics of Computation*, *19*(90), 297–301. https://doi.org/10.1090/S0025-5718-1965-0178586-1
 
-@article{lai_kaplan_2022,
-  author  = {Lai, Leo O. and Kaplan, Jed O.},
-  title   = {A Fast Mean-Preserving Spline for Interpolating Interval Data},
-  journal = {Journal of Atmospheric and Oceanic Technology},
-  volume  = {39},
-  number  = {4},
-  pages   = {503--512},
-  year    = {2022},
-  doi     = {10.1175/JTECH-D-21-0154.1}
-}
-```
+Lai, L. O., & Kaplan, J. O. (2022). A fast mean-preserving spline for interpolating interval data. *Journal of Atmospheric and Oceanic Technology*, *39*(4), 503–512. https://doi.org/10.1175/JTECH-D-21-0154.1
 
-> **Sobre datasets de referencia.** Si usás un sample WorldClim para validar tu pipeline, citá [Fick & Hijmans 2017](https://doi.org/10.1002/joc.5086). El stack `examples/data/worldclim_maipo_alto/` que distribuimos es un recorte derivado de ese producto.
+> **Sobre datasets de referencia.** Si usás datos WorldClim para validar tu pipeline, citá también:
+>
+> Fick, S. E., & Hijmans, R. J. (2017). WorldClim 2: New 1-km spatial resolution climate surfaces for global land areas. *International Journal of Climatology*, *37*(12), 4302–4315. https://doi.org/10.1002/joc.5086
+>
+> El stack `examples/data/worldclim_maipo_alto/` que distribuimos es un recorte derivado de ese producto.
 
 ## Contacto
 
