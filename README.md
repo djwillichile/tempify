@@ -36,11 +36,12 @@ Numerosos productos geoespaciales se distribuyen a frecuencia mensual o climatol
 - No es un weather generator estocástico (no inventa variabilidad sinóptica).
 - No interpola precipitación con métodos suaves (rechazado por diseño).
 
-## Tutorial
+## Tutoriales
 
-[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/01-getting-started.ipynb)
-
-Tutorial completo en Jupyter notebook ejecutable en Google Colab: [`docs/tutorials/01-getting-started.ipynb`](docs/tutorials/01-getting-started.ipynb). Recorre la API pública de `tempify` v0.1.0 sobre el sample sintético WorldClim Chile Central, demuestra los cuatro métodos de interpolación, verifica la conservación de la media mensual y muestra el reporte de procedencia.
+| Notebook | Descripción | Colab |
+|----------|-------------|-------|
+| [`01-getting-started.ipynb`](docs/tutorials/01-getting-started.ipynb) | Introducción a la API: datos sintéticos WorldClim-like, cuatro métodos de interpolación, conservación de media mensual, reporte de procedencia, visualización 3D. | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/01-getting-started.ipynb) |
+| [`02-real-worldclim-maipo.ipynb`](docs/tutorials/02-real-worldclim-maipo.ipynb) | Caso real con datos WorldClim v2.1 descargados para la cuenca del Maipo (Chile). Densificación mensual → diaria, análisis espacial y validación de conservación. | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/02-real-worldclim-maipo.ipynb) |
 
 ## Instalación
 
