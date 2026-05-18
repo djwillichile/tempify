@@ -82,7 +82,9 @@ def plot_monthly_rasters(
     monthly = read_monthly_stack(data_dir, variable=variable)
 
     rows = -(-12 // cols)  # división de techo
-    fig, axes = plt.subplots(rows, cols, figsize=figsize, sharex=True, sharey=True)
+    fig, axes = plt.subplots(
+        rows, cols, figsize=figsize, sharex=True, sharey=True, layout="constrained"
+    )
 
     vmin = float(monthly.min())
     vmax = float(monthly.max())
@@ -96,12 +98,10 @@ def plot_monthly_rasters(
         ax.set_yticks([])
 
     if im is not None:
-        fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.6, label=variable)
+        fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.8, aspect=30, label=variable)
 
     if title:
         fig.suptitle(title, fontsize=12, fontweight="bold", color="#0d2854")
-
-    plt.tight_layout()
 
     if output_path is not None:
         fig.savefig(output_path, dpi=150, bbox_inches="tight")
