@@ -38,11 +38,14 @@ repository-code: "https://github.com/djwillichile/tempify"
 url: "https://djwillichile.github.io/tempify/"
 version: "0.1.5"
 date-released: "2026-05-18"
-doi: "10.5281/zenodo.20265222"
+doi: "10.5281/zenodo.20277280"
 identifiers:
   - type: doi
-    value: "10.5281/zenodo.20265222"
+    value: "10.5281/zenodo.20277280"
     description: "Versión 0.1.5 archivada en Zenodo (DOI específico de esta release)"
+  - type: doi
+    value: "10.5281/zenodo.20265222"
+    description: "Versión 0.1.4 archivada en Zenodo (release anterior, conservado para trazabilidad)"
   - type: doi
     value: "10.5281/zenodo.20259997"
     description: "Versión 0.1.3 archivada en Zenodo (release anterior, conservado para trazabilidad)"
