@@ -76,21 +76,34 @@ def plot_monthly_rasters(
     _require_matplotlib()
 
     import matplotlib.pyplot as plt
+    import numpy as np
+    from matplotlib.gridspec import GridSpec
 
     from tempify.datasets import read_monthly_stack
 
     monthly = read_monthly_stack(data_dir, variable=variable)
 
     rows = -(-12 // cols)  # división de techo
-    fig, axes = plt.subplots(
-        rows, cols, figsize=figsize, sharex=True, sharey=True, layout="constrained"
-    )
+
+    # Columna dedicada para el colorbar (4% del ancho) — evita superposición
+    fig = plt.figure(figsize=figsize, layout="constrained")
+    gs = GridSpec(rows, cols + 1, figure=fig, width_ratios=[1] * cols + [0.04], hspace=0.25)
+
+    ax0: plt.Axes | None = None
+    axes_list: list[plt.Axes] = []
+    for r in range(rows):
+        for c in range(cols):
+            ax = fig.add_subplot(gs[r, c], sharex=ax0, sharey=ax0)
+            if ax0 is None:
+                ax0 = ax
+            axes_list.append(ax)
+    cbar_ax = fig.add_subplot(gs[:, -1])
 
     vmin = float(monthly.min())
     vmax = float(monthly.max())
 
     im = None
-    for i, ax in enumerate(axes.flat):
+    for i, ax in enumerate(axes_list):
         raster = monthly.isel(month=i).values
         im = ax.imshow(raster, cmap=cmap, vmin=vmin, vmax=vmax, aspect="auto")
         ax.set_title(_ETIQUETAS_MESES[i], fontsize=10, color="#0d2854")
@@ -98,10 +111,12 @@ def plot_monthly_rasters(
         ax.set_yticks([])
 
     if im is not None:
-        fig.colorbar(im, ax=axes.ravel().tolist(), shrink=0.8, aspect=30, label=variable)
+        fig.colorbar(im, cax=cbar_ax, label=variable)
 
     if title:
         fig.suptitle(title, fontsize=12, fontweight="bold", color="#0d2854")
+
+    axes = np.array(axes_list).reshape(rows, cols)
 
     if output_path is not None:
         fig.savefig(output_path, dpi=150, bbox_inches="tight")
