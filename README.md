@@ -49,10 +49,10 @@ Los modelos de distribución de especies requieren variables bioclimáticas deri
 
 ## Tutoriales
 
-| Notebook | Descripción | Colab |
-|----------|-------------|-------|
-| [`01-getting-started.ipynb`](docs/tutorials/01-getting-started.ipynb) | Introducción a la API: datos sintéticos WorldClim-like, cuatro métodos de interpolación, conservación de media mensual, reporte de procedencia, visualización 3D. | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/01-getting-started.ipynb) |
-| [`02-real-worldclim-maipo.ipynb`](docs/tutorials/02-real-worldclim-maipo.ipynb) | Caso real con datos WorldClim v2.1 descargados para la cuenca del Maipo (Chile). Densificación mensual → diaria, análisis espacial y validación de conservación. | [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/02-real-worldclim-maipo.ipynb) |
+| Notebook | Descripción |
+|----------|-------------|
+| [`01-getting-started.ipynb`](docs/tutorials/01-getting-started.ipynb) | Introducción a la API: datos sintéticos WorldClim-like, cuatro métodos de interpolación, conservación de media mensual, reporte de procedencia, visualización 3D. [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/01-getting-started.ipynb) |
+| [`02-real-worldclim-maipo.ipynb`](docs/tutorials/02-real-worldclim-maipo.ipynb) | Caso real con datos WorldClim v2.1 descargados para la cuenca del Maipo (Chile). Densificación mensual → diaria, análisis espacial y validación de conservación. [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/02-real-worldclim-maipo.ipynb) |
 
 ## Instalación
 
