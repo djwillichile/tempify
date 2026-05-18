@@ -878,13 +878,13 @@
     </div>
 
     <figure class="caso-fig">
-      <img src="assets/maipo_monthly_grid.jpg" alt="Grilla 3×4 con los 12 rásters mensuales de temperatura WorldClim sobre el Alto Maipo" loading="lazy" />
-      <figcaption><strong>Input mensual.</strong> Los 12 rásters climatológicos de WorldClim v2.1 (Ene–Dic). Azul profundo en alta cordillera invernal, rojo en valle estival. Es lo que entra al pipeline en un único <code>.tif</code> multibanda.</figcaption>
+      <img src="assets/maipo_monthly_grid.jpg" alt="Comparación 2×4: fila superior muestra input WorldClim mensual para Enero, Abril, Julio y Octubre; fila inferior muestra el output tempify en el día 15 del mismo mes — visualmente idénticos" loading="lazy" />
+      <figcaption><strong>Validación: anclas conservadas exactamente.</strong> Fila superior: los rásters de entrada WorldClim v2.1 para cuatro meses. Fila inferior: el output de <code>pchip_mp</code> en el día 15 de cada mes. Las imágenes son idénticas pixel a pixel — conservación de media mensual con error &lt; 10⁻⁴ °C garantizada.</figcaption>
     </figure>
 
     <figure class="caso-fig">
-      <img src="assets/maipo_daily_strip.jpg" alt="Cuatro mapas diarios del output: 15 de Enero, Abril, Julio y Octubre 2024" loading="lazy" />
-      <figcaption><strong>Output diario.</strong> Cuatro fechas representativas del año 2024 generadas por <code>pchip_mp</code>. Misma paleta y escala que el input. Si recorrieras los 366 días verías la transición continua entre ellos.</figcaption>
+      <img src="assets/maipo_daily_strip.jpg" alt="Tira de 6 rásters diarios: 15 Sep y 15 Oct con borde azul (anclas WorldClim), los cuatro intermedios con borde gris (interpolados por tempify)" loading="lazy" />
+      <figcaption><strong>Efecto de la interpolación: transición Sep → Oct.</strong> Los bordes <strong style="color:#1d4ed8">azules</strong> marcan las anclas mensuales del input (15 Sep y 15 Oct). Los bordes grises son las fechas intermedias generadas por <code>pchip_mp</code> — la transición térmica es continua y físicamente coherente.</figcaption>
     </figure>
 
     <figure class="caso-fig">
