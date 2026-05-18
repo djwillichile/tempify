@@ -37,12 +37,15 @@ license: MIT
 repository-code: "https://github.com/djwillichile/tempify"
 url: "https://djwillichile.github.io/tempify/"
 version: "0.1.4"
-date-released: "2026-05-17"
-doi: "10.5281/zenodo.20259997"
+date-released: "2026-05-18"
+doi: "10.5281/zenodo.20265222"
 identifiers:
   - type: doi
+    value: "10.5281/zenodo.20265222"
+    description: "Versión 0.1.4 archivada en Zenodo (DOI específico de esta release)"
+  - type: doi
     value: "10.5281/zenodo.20259997"
-    description: "Versión 0.1.3 archivada en Zenodo (DOI específico de esta release)"
+    description: "Versión 0.1.3 archivada en Zenodo (release anterior, conservado para trazabilidad)"
   - type: doi
     value: "10.5281/zenodo.20251750"
     description: "Versión 0.1.2 archivada en Zenodo (release anterior, conservado para trazabilidad)"
