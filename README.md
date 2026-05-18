@@ -7,7 +7,7 @@
 [![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)](https://github.com/djwillichile/tempify)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20277280.svg)](https://doi.org/10.5281/zenodo.20277280)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20277280.svg)](https://zenodo.org/records/20277280)
 
 
 ## ¿Qué es?
