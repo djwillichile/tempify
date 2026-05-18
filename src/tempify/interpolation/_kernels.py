@@ -181,6 +181,109 @@ def pchip_mp_kernel(
     return daily, iterations_used
 
 
+def akima_kernel(
+    m: NDArray[np.floating],
+    x_in: NDArray[np.floating],
+    x_out: NDArray[np.floating],
+    cyclic: bool,
+) -> NDArray[np.floating]:
+    """Akima 1970 piecewise cubic Hermite interpolation on the year axis.
+
+    Akima's method produces a C1 spline that is less aggressive than
+    PCHIP at flattening peaks but with fewer overshoots than natural
+    cubic splines. Useful for variables with brief excursions that
+    PCHIP would over-smooth (per ADR-0018).
+
+    Parameters
+    ----------
+    m : numpy.ndarray
+        12 monthly values placed at ``x_in``.
+    x_in : numpy.ndarray
+        Strictly increasing array of length 12 with the day-of-year of
+        each monthly anchor.
+    x_out : numpy.ndarray
+        Strictly increasing array of length N with target days-of-year.
+    cyclic : bool
+        If True, treat the year as periodic. Like ``pchip_kernel``, we
+        pad the input nodes with two wrap nodes on each side so that
+        the C1 join across the December-January boundary is correct.
+
+    Returns
+    -------
+    numpy.ndarray
+        Array of length ``len(x_out)`` with the interpolated values.
+    """
+    from scipy.interpolate import Akima1DInterpolator  # type: ignore[import-untyped]
+
+    if cyclic:
+        period = float(x_out[-1] - x_out[0]) + 1.0
+        m_ext = np.concatenate(([m[-2], m[-1]], m, [m[0], m[1]]))
+        x_ext = np.concatenate(
+            (
+                [x_in[-2] - period, x_in[-1] - period],
+                x_in,
+                [x_in[0] + period, x_in[1] + period],
+            )
+        )
+        akima = Akima1DInterpolator(x_ext, m_ext)
+        return np.asarray(akima(x_out))
+    akima = Akima1DInterpolator(x_in, m)
+    return np.asarray(akima(x_out, extrapolate=True))
+
+
+def cubic_kernel(
+    m: NDArray[np.floating],
+    x_in: NDArray[np.floating],
+    x_out: NDArray[np.floating],
+    cyclic: bool,
+) -> NDArray[np.floating]:
+    """Natural cubic spline interpolation on the year axis.
+
+    Uses ``scipy.interpolate.CubicSpline`` with periodic boundary
+    conditions when ``cyclic=True`` (the spline value and its first
+    two derivatives match at year start/end). Otherwise uses the
+    default ``not-a-knot`` boundary. Cubic splines provide C2
+    continuity but **can overshoot** between knots; use ``pchip`` if
+    monotonicity matters (per ADR-0018).
+
+    Parameters
+    ----------
+    m : numpy.ndarray
+        12 monthly values placed at ``x_in``.
+    x_in : numpy.ndarray
+        Strictly increasing array of length 12 with the day-of-year of
+        each monthly anchor.
+    x_out : numpy.ndarray
+        Strictly increasing array of length N with target days-of-year.
+    cyclic : bool
+        If True, use periodic boundary conditions. Per the scipy spec
+        this requires ``m[0] == m[-1]`` exactly — since this is rarely
+        the case for monthly climatologies, we pad with the wrap node
+        on each side (same pattern as ``pchip_kernel``).
+
+    Returns
+    -------
+    numpy.ndarray
+        Array of length ``len(x_out)`` with the interpolated values.
+    """
+    from scipy.interpolate import CubicSpline  # type: ignore[import-untyped]
+
+    if cyclic:
+        period = float(x_out[-1] - x_out[0]) + 1.0
+        m_ext = np.concatenate(([m[-2], m[-1]], m, [m[0], m[1]]))
+        x_ext = np.concatenate(
+            (
+                [x_in[-2] - period, x_in[-1] - period],
+                x_in,
+                [x_in[0] + period, x_in[1] + period],
+            )
+        )
+        spline = CubicSpline(x_ext, m_ext, bc_type="not-a-knot", extrapolate=False)
+        return np.asarray(spline(x_out))
+    spline = CubicSpline(x_in, m, bc_type="not-a-knot", extrapolate=True)
+    return np.asarray(spline(x_out))
+
+
 def fourier_kernel(
     m: NDArray[np.floating],
     x_in: NDArray[np.floating],

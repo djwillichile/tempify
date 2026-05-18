@@ -36,7 +36,7 @@ keywords:
 license: MIT
 repository-code: "https://github.com/djwillichile/tempify"
 url: "https://djwillichile.github.io/tempify/"
-version: "0.1.3"
+version: "0.1.4"
 date-released: "2026-05-17"
 doi: "10.5281/zenodo.20259997"
 identifiers:
@@ -73,3 +73,41 @@ references:
     year: 1980
     start: 238
     end: 246
+    doi: "10.1137/0717021"
+  - type: article
+    authors:
+      - family-names: Akima
+        given-names: Hiroshi
+    title: "A New Method of Interpolation and Smooth Curve Fitting Based on Local Procedures"
+    journal: "Journal of the ACM"
+    volume: 17
+    issue: 4
+    year: 1970
+    start: 589
+    end: 602
+    doi: "10.1145/321607.321609"
+  - type: book
+    authors:
+      - family-names: de Boor
+        given-names: Carl
+    title: "A Practical Guide to Splines (Applied Mathematical Sciences, vol. 27)"
+    publisher:
+      name: Springer-Verlag
+      city: New York
+    year: 1978
+    isbn: "978-0-387-95366-3"
+  - type: article
+    authors:
+      - family-names: Lai
+        given-names: Leo O.
+      - family-names: Kaplan
+        given-names: Jed O.
+    title: "A Fast Mean-Preserving Spline for Interpolating Interval Data"
+    journal: "Journal of Atmospheric and Oceanic Technology"
+    volume: 39
+    issue: 4
+    year: 2022
+    start: 503
+    end: 512
+    doi: "10.1175/JTECH-D-21-0154.1"
+    notes: "Planificado para v0.2.0 como método cubic_mp_lai_kaplan (ver ADR-0018)."

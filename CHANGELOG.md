@@ -7,7 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Pendiente para v0.2.0
+### Pendiente para v0.2.0+
+
+- `cubic_mp_lai_kaplan`: spline mean-preserving moderno per [Lai & Kaplan 2022, JTECH](https://journals.ametsoc.org/view/journals/atot/39/4/JTECH-D-21-0154.1.xml). Reemplazaría a Rymes-Myers como baseline mean-preserving.
+- Post-procesador `SavitzkyGolayPostProcessor` (nueva fase opcional del pipeline tras `interpolate`, antes de `validate_post`).
+- `WhittakerHendersonInterpolator` como alternativa flexible a `fourier` con preservación de momentos.
+
+Ver [ADR-0018](docs/adr/0018-classical-interpolator-catalog.md) para el roadmap completo.
+
+## [0.1.4] — 2026-05-18
+
+Release de extensión del catálogo de interpoladores: dos métodos clásicos nuevos (akima, cubic) per [ADR-0018](docs/adr/0018-classical-interpolator-catalog.md). Sin breaking changes; los 4 métodos existentes (`linear`, `pchip`, `pchip_mp`, `fourier`) siguen byte-idénticos a v0.1.3.
+
+### Added
+
+- **`AkimaInterpolator`** (`src/tempify/interpolation/akima.py`): spline C¹ de Akima 1970 con cyclic option (dos wrap nodes per side, ADR-0016). Menos agresivo que PCHIP al aplanar máximos locales, menos overshoots que cubic. Envuelve `scipy.interpolate.Akima1DInterpolator`.
+- **`CubicSplineInterpolator`** (`src/tempify/interpolation/cubic.py`): spline natural C² (not-a-knot). Más suave que PCHIP, pero **puede overshoot entre nodos** — usar `pchip` o `pchip_mp` si la monotonicidad importa. Envuelve `scipy.interpolate.CubicSpline`.
+- Kernels nuevos en `_kernels.py`: `akima_kernel`, `cubic_kernel`, ambos con padding cíclico de 2 wrap nodes por lado.
+- 14 tests unitarios nuevos (`tests/unit/interpolation/test_akima.py`, `test_cubic.py`) cubriendo kernel + facade: input constante, pass-through de nodos, error sinusoidal acotado, extrapolación non-cyclic, NaN policy raise + propagate_all.
+- **ADR-0018**: catálogo extensible de interpoladores clásicos. Documenta las 8 familias revisadas (cubic, Akima, Makima, Lai-Kaplan, Savitzky-Golay, Whittaker-Henderson, GPR, STL) con sus tradeoffs y plan de release.
+- `tempify_method` attr ahora puede valer `"akima"` o `"cubic"`.
+- CLI: `tempify convert --method akima|cubic` acepta los nuevos métodos.
+- Perfiles de variable actualizados (`temperature`, `relative_humidity`, `solar_radiation`) para aceptar `akima` y `cubic`. `precipitation` los rechaza por defecto (consistente con [ADR-0004](docs/adr/0004-precipitation-policy.md)).
+
+### Changed
+
+- `InterpolationMethod` Literal ahora incluye 6 valores: `"linear" | "pchip" | "pchip_mp" | "fourier" | "akima" | "cubic"`.
+- Suite de tests: 241 → **257 passing** (1 skipped por extra opcional `zarr`).
+- Documentación landing + README: tabla de métodos extendida a 6 filas.
+- Notebook tutorial: loop de comparación Demo 2 ahora incluye los 6 métodos.
+
+## [0.1.3] — 2026-05-17
 
 - Capa 7 (GUI) basada en PySide6 (deferred del v0.1.0).
 - Empaquetado Windows (PyInstaller `--onedir` + Inno Setup) (deferred del v0.1.0).

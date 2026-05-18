@@ -2,7 +2,7 @@ name: temperature
 canonical_name: air_temperature
 units: degC
 aliases: [tavg, tmean, tas, tmp, temperatura]
-allowed_methods: [linear, pchip, pchip_mp, fourier]
+allowed_methods: [linear, pchip, pchip_mp, fourier, akima, cubic]
 physical_range:
   min: -90.0
   max: 60.0

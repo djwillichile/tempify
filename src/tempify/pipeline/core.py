@@ -20,6 +20,8 @@ from tempify.detection.frequency import (
 )
 from tempify.interpolation import (
     BaseInterpolator,
+    AkimaInterpolator,
+    CubicSplineInterpolator,
     FourierInterpolator,
     LinearInterpolator,
     PchipInterpolator,
@@ -226,6 +228,10 @@ class TempifyPipeline:
         elif method == "fourier":
             opts = self.config.method_options
             interpolator = FourierInterpolator(n_harmonics=int(opts.get("n_harmonics", 3)))
+        elif method == "akima":
+            interpolator = AkimaInterpolator()
+        elif method == "cubic":
+            interpolator = CubicSplineInterpolator()
         else:  # pragma: no cover - exhaustively handled by Literal
             raise PipelineInterpolationError(f"Método desconocido: {method!r}")
 
