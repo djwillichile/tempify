@@ -2,7 +2,7 @@ name: solar_radiation
 canonical_name: surface_downwelling_shortwave_flux_in_air
 units: "W m-2"
 aliases: [srad, rsds, radiacion_solar]
-allowed_methods: [linear, pchip, pchip_mp, fourier]
+allowed_methods: [linear, pchip, pchip_mp, fourier, akima, cubic]
 physical_range:
   min: 0.0
   max: 1361.0

@@ -89,6 +89,8 @@ print(result.report.method)  # 'pchip_mp'
 | `pchip` | Piecewise Cubic Hermite (shape-preserving) | Uso general |
 | `pchip_mp` | PCHIP + Rymes-Myers mean-preserving | **Producto final, máxima fidelidad** |
 | `fourier` | Ajuste armónico (1-5 armónicos) | Representación paramétrica del ciclo |
+| `akima` | Akima 1970 (C¹, menos overshoot que cubic) | Variables con cambios bruscos |
+| `cubic` | Spline natural C² | Señales muy suaves (puede overshoot) |
 
 ## Estado del proyecto
 
@@ -162,7 +164,7 @@ Para metadatos completos (autores, afiliación, ORCID, referencias bibliográfic
 
 ### Cita corta (recomendada)
 
-> Fuentes-Jaque, G. S. (2026). *tempify: Temporal densification for geospatial raster stacks* (v0.1.3) \[Software\]. ICTA Ltda. https://doi.org/10.5281/zenodo.20259997
+> Fuentes-Jaque, G. S. (2026). *tempify: Temporal densification for geospatial raster stacks* (v0.1.4) \[Software\]. ICTA Ltda. https://doi.org/10.5281/zenodo.20259997
 
 ### BibTeX
 
@@ -172,13 +174,98 @@ Para metadatos completos (autores, afiliación, ORCID, referencias bibliográfic
   orcid        = {0000-0002-7864-4899},
   title        = {{tempify}: Temporal densification for geospatial raster stacks},
   year         = {2026},
-  version      = {0.1.3},
+  version      = {0.1.4},
   organization = {ICTA Ltda.; Universidad San Sebastián; Universidad de Chile},
   publisher    = {Zenodo},
   doi          = {10.5281/zenodo.20259997},
   url          = {https://doi.org/10.5281/zenodo.20259997}
 }
 ```
+
+## Referencias bibliográficas de los métodos
+
+Las publicaciones originales detrás de cada método de interpolación que `tempify` implementa. Si usás un método específico en una publicación científica, citá también el paper correspondiente (no solo el paquete). Todas las revistas están indexadas en Web of Science / JCR.
+
+| Método | Paper / libro fundacional | DOI |
+|---|---|---|
+| `pchip`, `pchip_mp` (base) | Fritsch & Carlson 1980 — SIAM J. Numer. Anal. | [10.1137/0717021](https://doi.org/10.1137/0717021) |
+| `pchip_mp` (corrección) | Rymes & Myers 2001 — Solar Energy | [10.1016/S0038-092X(01)00052-4](https://doi.org/10.1016/S0038-092X(01)00052-4) |
+| `akima` | Akima 1970 — J. ACM | [10.1145/321607.321609](https://doi.org/10.1145/321607.321609) |
+| `cubic` | de Boor 1978 — *A Practical Guide to Splines*, Springer | ISBN 978-0-387-95366-3 |
+| `fourier` | Cooley & Tukey 1965 — Math. Comp. (FFT) | [10.1090/S0025-5718-1965-0178586-1](https://doi.org/10.1090/S0025-5718-1965-0178586-1) |
+| _v0.2.0_ `cubic_mp_lai_kaplan` | Lai & Kaplan 2022 — J. Atmos. Oceanic Tech. | [10.1175/JTECH-D-21-0154.1](https://doi.org/10.1175/JTECH-D-21-0154.1) |
+
+### BibTeX listo para copiar
+
+```bibtex
+@article{fritsch_carlson_1980,
+  author  = {Fritsch, F. N. and Carlson, R. E.},
+  title   = {Monotone Piecewise Cubic Interpolation},
+  journal = {SIAM Journal on Numerical Analysis},
+  volume  = {17},
+  number  = {2},
+  pages   = {238--246},
+  year    = {1980},
+  doi     = {10.1137/0717021}
+}
+
+@article{rymes_myers_2001,
+  author  = {Rymes, M. D. and Myers, D. R.},
+  title   = {Mean Preserving Algorithm for Smoothly Interpolating Averaged Data},
+  journal = {Solar Energy},
+  volume  = {71},
+  number  = {4},
+  pages   = {225--231},
+  year    = {2001},
+  doi     = {10.1016/S0038-092X(01)00052-4}
+}
+
+@article{akima_1970,
+  author  = {Akima, Hiroshi},
+  title   = {A New Method of Interpolation and Smooth Curve Fitting Based on Local Procedures},
+  journal = {Journal of the ACM},
+  volume  = {17},
+  number  = {4},
+  pages   = {589--602},
+  year    = {1970},
+  doi     = {10.1145/321607.321609}
+}
+
+@book{deboor_1978,
+  author    = {de Boor, Carl},
+  title     = {A Practical Guide to Splines},
+  series    = {Applied Mathematical Sciences},
+  volume    = {27},
+  publisher = {Springer-Verlag},
+  address   = {New York},
+  year      = {1978},
+  isbn      = {978-0-387-95366-3}
+}
+
+@article{cooley_tukey_1965,
+  author  = {Cooley, James W. and Tukey, John W.},
+  title   = {An Algorithm for the Machine Calculation of Complex Fourier Series},
+  journal = {Mathematics of Computation},
+  volume  = {19},
+  number  = {90},
+  pages   = {297--301},
+  year    = {1965},
+  doi     = {10.1090/S0025-5718-1965-0178586-1}
+}
+
+@article{lai_kaplan_2022,
+  author  = {Lai, Leo O. and Kaplan, Jed O.},
+  title   = {A Fast Mean-Preserving Spline for Interpolating Interval Data},
+  journal = {Journal of Atmospheric and Oceanic Technology},
+  volume  = {39},
+  number  = {4},
+  pages   = {503--512},
+  year    = {2022},
+  doi     = {10.1175/JTECH-D-21-0154.1}
+}
+```
+
+> **Sobre datasets de referencia.** Si usás un sample WorldClim para validar tu pipeline, citá [Fick & Hijmans 2017](https://doi.org/10.1002/joc.5086). El stack `examples/data/worldclim_maipo_alto/` que distribuimos es un recorte derivado de ese producto.
 
 ## Contacto
 

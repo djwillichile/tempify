@@ -46,7 +46,10 @@ def convert(
     ] = Path("./tempify_out"),
     method: Annotated[
         str,
-        typer.Option("--method", "-m", help="Método: linear, pchip, pchip_mp, fourier."),
+        typer.Option(
+            "--method", "-m",
+            help="Método: linear, pchip, pchip_mp, fourier, akima, cubic.",
+        ),
     ] = "pchip_mp",
     year: Annotated[
         int,

@@ -10,7 +10,7 @@ from typing import Any, Literal
 from tempify.pipeline.callbacks import FrequencyResolverProtocol, ProgressCallback
 from tempify.pipeline.errors import InvalidConfigError
 
-InterpolationMethod = Literal["linear", "pchip", "pchip_mp", "fourier"]
+InterpolationMethod = Literal["linear", "pchip", "pchip_mp", "fourier", "akima", "cubic"]
 OutputFormat = Literal["netcdf", "geotiff_collection", "multiband_geotiff", "zarr"]
 ReproMode = Literal["strict", "parallel"]
 MonthlyAnchor = Literal["midpoint", "start", "end", "custom"]
