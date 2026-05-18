@@ -51,13 +51,13 @@ Los modelos de distribución de especies requieren variables bioclimáticas deri
 
 | Notebook | Descripción |
 |----------|-------------|
-| [`01-getting-started.ipynb`](docs/tutorials/01-getting-started.ipynb) | Introducción a la API: datos sintéticos WorldClim-like, cuatro métodos de interpolación, conservación de media mensual, reporte de procedencia, visualización 3D. [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/01-getting-started.ipynb) |
+| [`01-getting-started.ipynb`](docs/tutorials/01-getting-started.ipynb) | Introducción a la API: datos sintéticos WorldClim-like, seis métodos de interpolación, conservación de media mensual, reporte de procedencia, visualización 3D. [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/01-getting-started.ipynb) |
 | [`02-real-worldclim-maipo.ipynb`](docs/tutorials/02-real-worldclim-maipo.ipynb) | Caso real con datos WorldClim v2.1 descargados para la cuenca del Maipo (Chile). Densificación mensual → diaria, análisis espacial y validación de conservación. [![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/02-real-worldclim-maipo.ipynb) |
 
 ## Instalación
 
 ```bash
-# Desde el repo (recomendado para v0.1.0)
+# Desde el repo (recomendado para v0.1.x)
 git clone https://github.com/djwillichile/tempify.git
 cd tempify
 pip install -e ".[dev]"
@@ -105,6 +105,8 @@ print(result.report.method)  # 'pchip_mp'
 | `cubic` | Spline natural C² | Señales muy suaves (puede overshoot) |
 
 ## Estado del proyecto
+
+**v0.1.5** (2026-05-18) — Módulos auxiliares `datasets`, `utils`, `plotting`; seis métodos de interpolación (`akima` y `cubic` agregados en v0.1.4); notebooks simplificados. Ver [CHANGELOG](CHANGELOG.md).
 
 **v0.1.0 — primer release funcional** (2026-05-16). Capas 1-6 implementadas (I/O, Detection, Validation, Interpolation, Pipeline, CLI), 241 tests passing, 91% coverage, 17 ADRs documentados.
 
