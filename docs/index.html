@@ -878,8 +878,8 @@
     </div>
 
     <figure class="caso-fig">
-      <img src="assets/maipo_monthly_grid.jpg" alt="Comparación 2×4: fila superior muestra input WorldClim mensual para Enero, Abril, Julio y Octubre; fila inferior muestra el output tempify en el día 15 del mismo mes — visualmente idénticos" loading="lazy" />
-      <figcaption><strong>Validación: anclas conservadas exactamente.</strong> Fila superior: los rásters de entrada WorldClim v2.1 para cuatro meses. Fila inferior: el output de <code>pchip_mp</code> en el día 15 de cada mes. Las imágenes son idénticas pixel a pixel — conservación de media mensual con error &lt; 10⁻⁴ °C garantizada.</figcaption>
+      <img src="assets/maipo_monthly_grid.jpg" alt="Comparación 3×4: fila superior muestra input WorldClim mensual para Enero, Abril, Julio y Octubre; fila central muestra el output tempify cubic spline en el día 15 del mismo mes; fila inferior muestra la diferencia ancla menos predicción con colorbar independiente" loading="lazy" />
+      <figcaption><strong>Validación: anclas conservadas con cubic spline.</strong> Fila 1: rásters de entrada WorldClim v2.1 para cuatro meses. Fila 2: salida de <code>cubic</code> en el día 15 del mismo mes (visualmente indistinguible). Fila 3: residual ancla − predicción con <strong>colorbar diverging independiente</strong> (escala ±0.11 °C). Aun con un método no mean-preserving, los días-ancla quedan acotados a una décima de grado; el sesgo se concentra en meses de transición estacional (Octubre, primavera austral), cuando la curvatura local del spline es máxima.</figcaption>
     </figure>
 
     <figure class="caso-fig">
