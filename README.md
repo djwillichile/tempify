@@ -180,7 +180,7 @@ Para metadatos completos (autores, afiliación, ORCID) ver [CITATION.cff](CITATI
 
 ## Referencias bibliográficas de los métodos
 
-Las publicaciones originales detrás de cada método de interpolación que `tempify` implementa. Si usás un método específico en una publicación científica, citá también el paper correspondiente (no solo el paquete). Todas las revistas están indexadas en Web of Science / JCR. Entradas BibTeX en [`REFERENCES.bib`](REFERENCES.bib).
+Las publicaciones originales detrás de cada método de interpolación que `tempify` implementa. Si usas un método específico en una publicación científica, cita también el paper correspondiente (no solo el paquete). Todas las revistas están indexadas en Web of Science / JCR. Entradas BibTeX en [`REFERENCES.bib`](REFERENCES.bib).
 
 | Método | Clave BibTeX |
 |--------|-------------|
@@ -205,7 +205,7 @@ Cooley, J. W., & Tukey, J. W. (1965). An algorithm for the machine calculation o
 
 Lai, L. O., & Kaplan, J. O. (2022). A fast mean-preserving spline for interpolating interval data. *Journal of Atmospheric and Oceanic Technology*, *39*(4), 503–512. https://doi.org/10.1175/JTECH-D-21-0154.1
 
-> **Sobre datasets de referencia.** El stack `examples/data/worldclim_maipo_alto/` que distribuimos es un recorte derivado de WorldClim v2.1. Si lo usás en publicaciones, citá el producto original.
+> **Sobre datasets de referencia.** El stack `examples/data/worldclim_maipo_alto/` que distribuimos es un recorte derivado de WorldClim v2.1. Si lo usas en publicaciones, cita el producto original.
 
 ### Datasets de entrada citados en la documentación
 

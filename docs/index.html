@@ -415,6 +415,7 @@
   .qs-block {
     background: var(--bg-card); border: 1px solid var(--line);
     border-radius: 14px; padding: 22px;
+    min-width: 0; /* prevent grid blowout when pre.code has long lines */
   }
   .qs-block h4 {
     color: var(--text-soft); font-size: 11px; margin: 0 0 12px;
@@ -581,6 +582,11 @@
     .hero h1 { font-size: 28px; }
     .cta-row .btn { flex: 1 1 100%; justify-content: center; }
     footer .grid { grid-template-columns: 1fr; }
+
+    /* Quickstart: reducir padding + font para evitar overflow en URLs largas */
+    .qs-block { padding: 16px; }
+    .qs-block h4 { font-size: 10px; margin-bottom: 10px; }
+    pre.code { font-size: 11.5px; padding: 12px; line-height: 1.5; }
   }
 </style>
 </head>
@@ -634,7 +640,7 @@
     <div style="margin-top: 18px;">
       <a href="https://doi.org/10.5281/zenodo.20297689" style="display:inline-flex;align-items:center;gap:6px;font-size:13px;color:var(--text-muted);background:rgba(255,255,255,0.85);padding:6px 12px;border-radius:6px;border:1px solid var(--line);text-decoration:none;">
         <img src="https://zenodo.org/badge/DOI/10.5281/zenodo.20297689.svg" alt="DOI" style="height:20px;vertical-align:middle;" />
-        <span>citá esta versión con DOI</span>
+        <span>cita el producto</span>
       </a>
     </div>
   </div>
@@ -774,7 +780,7 @@
       <div class="feature">
         <div class="icon">⚙</div>
         <h3>Seis métodos validados</h3>
-        <p>Lineal, PCHIP, PCHIP+Rymes-Myers (mean-preserving), Fourier multi-armónico, Akima y Cubic spline. Elegís según el tradeoff suavidad / fidelidad / costo.</p>
+        <p>Lineal, PCHIP, PCHIP+Rymes-Myers (mean-preserving), Fourier multi-armónico, Akima y Cubic spline. Eliges según el tradeoff suavidad / fidelidad / costo.</p>
       </div>
       <div class="feature">
         <div class="icon">⚖</div>
@@ -905,12 +911,11 @@
       <div class="qs-block">
         <h4>1. Instalación</h4>
 <pre class="code"><span class="cmt"># desde el repositorio</span>
-<span class="pr">$</span> pip install git+https://github.com/djwillichile/tempify.git
+<span class="pr">$</span> pip install git+https://github.com/djwillichile/tempify
 
-<span class="cmt"># o, una vez clonado, en modo editable</span>
-<span class="pr">$</span> git clone https://github.com/djwillichile/tempify.git
-<span class="pr">$</span> cd tempify
-<span class="pr">$</span> pip install -e .</pre>
+<span class="cmt"># o en modo editable (tras clonar)</span>
+<span class="pr">$</span> git clone https://github.com/djwillichile/tempify
+<span class="pr">$</span> cd tempify && pip install -e .</pre>
       </div>
       <div class="qs-block">
         <h4>2. CLI</h4>
@@ -947,7 +952,7 @@ r2 <span class="kw">=</span> <span class="fn">tempify</span>(r, from_freq<span c
   <div class="container">
     <h2>Tutorial en Google Colab</h2>
     <p class="lede">
-      Notebook ejecutable que recorre la API pública end-to-end. Sin instalación local: arrancás directo desde el navegador.
+      Notebook ejecutable que recorre la API pública end-to-end. Sin instalación local: arrancas directo desde el navegador.
     </p>
     <div class="tutorial-card">
       <div>
