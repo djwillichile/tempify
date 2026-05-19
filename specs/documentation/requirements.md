@@ -4,18 +4,19 @@
 **Owner:** Guillermo Fuentes-Jaque
 **Fecha creación:** 2026-05-19
 **Última actualización:** 2026-05-19
+**Release target:** v0.1.6 (junto con la API ergonómica ya mergeada en `5fdfecf`)
 
 ## 1. Propósito
 
-Publicar un sitio de documentación auto-generado en `tempify.readthedocs.io` que consolide la referencia API, los tutoriales ejecutables (notebooks), las decisiones arquitectónicas (ADRs), los schemas de datos y la metodología científica del proyecto. La URL ya está anunciada en `pyproject.toml` pero hoy no resuelve, lo que constituye una promesa incumplida hacia usuarios y citadores académicos.
+Publicar un sitio de documentación auto-generado en `tempify.readthedocs.io` que consolide la referencia API (incluida la API ergonómica `rast` / `tempify` / `plot` introducida en v0.1.6), los tutoriales ejecutables (notebooks), las decisiones arquitectónicas (ADRs), los schemas de datos y la metodología científica del proyecto. La URL ya está anunciada en `pyproject.toml` pero hoy no resuelve, lo que constituye una promesa incumplida hacia usuarios y citadores académicos. Esta spec es el último entregable del ciclo v0.1.6 antes de tag y release.
 
 ## 2. Alcance
 
 ### In-scope
 
 - Configuración Sphinx (`docs/conf.py`, `docs/index.md`, `docs/_static/`, `docs/Makefile`, `.readthedocs.yaml`).
-- Referencia API auto-generada con `sphinx.ext.autodoc` + `sphinx.ext.napoleon` (estilo NumPy, ya canónico en el código).
-- Integración de los 2 notebooks de `docs/tutorials/` vía `myst-nb` con ejecución cacheada.
+- Referencia API auto-generada con `sphinx.ext.autodoc` + `sphinx.ext.napoleon` (estilo NumPy, ya canónico en el código). Cobertura prioritaria: el módulo `tempify.api` (API ergonómica v0.1.6: `rast`, `tempify`, `plot`, `TempifyRast`).
+- Integración de los 3 notebooks de `docs/tutorials/` vía `myst-nb` con ejecución cacheada: `01-getting-started.ipynb`, `02-real-worldclim-maipo.ipynb`, `03-ergonomic-api.ipynb`.
 - Renderizado de `docs/adr/*.md`, `docs/methodology/*.md` y `docs/schemas/*.md` vía `myst-parser`, navegables como secciones de primer nivel.
 - Citas científicas con `sphinxcontrib-bibtex` apuntando a `REFERENCES.bib` (raíz del repo).
 - Doctests ejecutables en CI: `pytest --doctest-modules src/tempify` + `sphinx-build -b doctest`.
@@ -23,6 +24,7 @@ Publicar un sitio de documentación auto-generado en `tempify.readthedocs.io` qu
 - Workflow `.github/workflows/docs.yml`: build sin warnings en cada PR, deploy a Read the Docs en push a `main` vía webhook.
 - `CONTRIBUTING.md` con sección "Documentation": cómo construir localmente, escribir docstrings, agregar tutoriales.
 - Auditoría de cobertura de docstrings en API pública (reporte en `impl-log.md`, no migración masiva si ya cumplen NumPy).
+- Quickstart en la portada del sitio basado en la API ergonómica: `from tempify import rast, tempify, plot`.
 
 ### Out-of-scope
 
@@ -31,7 +33,8 @@ Publicar un sitio de documentación auto-generado en `tempify.readthedocs.io` qu
 - Diagramas Mermaid/PlantUML interactivos. Diferido a fase 2 si emerge necesidad.
 - Documentación de internals privados (`_kernels.py`, módulos prefijados con `_`).
 - Versionado multi-rama con `sphinx-multiversion`. Solo `latest` y `stable` (defaults de RTD).
-- Migración del CLI/GUI a inglés (permanecen en español per sus specs respectivas).
+- Migración del CLI a inglés (permanece en español per su spec).
+- **Documentación del módulo `tempify.gui` (PySide6).** La aplicación de escritorio NO entra en el ciclo v0.1.6; su documentación se difiere a la versión que incluya la GUI. En esta spec se excluye `tempify.gui` del autodoc por completo (ver REQ-011).
 
 ## 3. Actores y casos de uso
 
@@ -39,7 +42,16 @@ Publicar un sitio de documentación auto-generado en `tempify.readthedocs.io` qu
 
 > Como investigador climático que descubre tempify en PyPI, quiero leer una guía de inicio rápido y ver ejemplos ejecutados con datos reales para decidir en 10 minutos si la librería resuelve mi caso.
 
-**Caso de uso típico:** Llega desde el README a `tempify.readthedocs.io/en/latest/`, navega a "Tutorials", abre `01-getting-started` renderizado con outputs y figuras, decide instalar.
+**Caso de uso típico:** Llega desde el README a `tempify.readthedocs.io/en/latest/`, ve en la portada un quickstart de cuatro líneas con la API ergonómica:
+
+```python
+from tempify import rast, tempify, plot
+r  = rast("worldclim_tmax.tif")
+r2 = tempify(r, from_freq="monthly", to_freq="daily", method="cubic")
+plot(r2)
+```
+
+Navega a "Tutorials", abre `01-getting-started` o `03-ergonomic-api` renderizado con outputs y figuras, decide instalar.
 
 ### Actor 2: Usuario que necesita la firma exacta de una función
 
@@ -67,11 +79,15 @@ THE SYSTEM SHALL build a Sphinx-based HTML documentation site from sources in `d
 
 ### REQ-002 (Ubiquitous)
 
-THE SYSTEM SHALL auto-generate API reference pages for every public symbol of the `tempify` package using `sphinx.ext.autodoc` + `sphinx.ext.napoleon` with `napoleon_numpy_docstring = True`.
+THE SYSTEM SHALL auto-generate API reference pages for every public symbol of the `tempify` package using `sphinx.ext.autodoc` + `sphinx.ext.napoleon` with `napoleon_numpy_docstring = True`. The `tempify.api` module (ergonomic API introduced in v0.1.6: `rast`, `tempify`, `plot`, `TempifyRast`) SHALL appear as the first entry of the API reference table of contents.
+
+### REQ-002b (Ubiquitous, landing quickstart)
+
+THE SYSTEM SHALL place a four-line quickstart on the documentation landing page (`docs/index.md`) using the ergonomic API (`from tempify import rast, tempify, plot`), so first-time visitors see runnable code within the first viewport.
 
 ### REQ-003 (Event-driven)
 
-WHEN building docs, THE SYSTEM SHALL render `docs/tutorials/*.ipynb` notebooks via `myst-nb` with execution caching enabled (`nb_execution_mode = "cache"`).
+WHEN building docs, THE SYSTEM SHALL render all three notebooks in `docs/tutorials/` (`01-getting-started.ipynb`, `02-real-worldclim-maipo.ipynb`, `03-ergonomic-api.ipynb`) via `myst-nb` with execution caching enabled (`nb_execution_mode = "cache"`).
 
 ### REQ-004 (Ubiquitous)
 
@@ -103,7 +119,7 @@ THE SYSTEM SHALL provide a `CONTRIBUTING.md` file at the repository root with a 
 
 ### REQ-011 (Ubiquitous, autodoc isolation)
 
-THE SYSTEM SHALL configure `autodoc_mock_imports = ["PySide6"]` in `docs/conf.py` so the API build does not require a graphical environment, and SHALL exclude `tempify.gui` from API reference generation if its import surface is not stable in CI.
+THE SYSTEM SHALL exclude the `tempify.gui` module from API reference generation for the v0.1.6 release (the desktop application is out of scope) by adding `tempify.gui*` to `autodoc_default_options["exclude-members"]` or via `autosummary` filters in `docs/conf.py`. As defensive measure THE SYSTEM SHALL also declare `autodoc_mock_imports = ["PySide6"]` so future re-inclusion of GUI docs does not require a graphical environment.
 
 ### REQ-012 (State-driven)
 
@@ -137,8 +153,9 @@ WHERE a docstring example uses non-deterministic input (current time, random wit
 Trazabilidad REQ → test/verificación (cada REQ tiene al menos un check):
 
 - [ ] REQ-001 → `sphinx-build -W -b html docs docs/_build/html` exit 0
-- [ ] REQ-002 → Test `test_api_reference_includes_public_symbols` enumera símbolos públicos y verifica presencia en HTML generado
-- [ ] REQ-003 → `docs/_build/html/tutorials/01-getting-started.html` contiene outputs renderizados
+- [ ] REQ-002 → Test `test_api_reference_includes_public_symbols` enumera símbolos públicos y verifica presencia en HTML generado; `tempify.api` aparece como primer ítem del TOC de la referencia API
+- [ ] REQ-002b → Test `test_landing_page_quickstart_present` verifica que `docs/_build/html/index.html` contiene el bloque `from tempify import rast, tempify, plot`
+- [ ] REQ-003 → `docs/_build/html/tutorials/{01-getting-started,02-real-worldclim-maipo,03-ergonomic-api}.html` contienen outputs renderizados
 - [ ] REQ-004 → `docs/_build/html/adr/0001-xarray-as-core-data-model.html` existe y es accesible desde toctree
 - [ ] REQ-005 → Test `test_bibtex_citation_resolves` valida al menos una cita en `methodology/precipitation.md`
 - [ ] REQ-006 → Job `doctests` en `docs.yml` corre y falla la PR si rompe
@@ -146,7 +163,7 @@ Trazabilidad REQ → test/verificación (cada REQ tiene al menos un check):
 - [ ] REQ-008 → Job `sphinx-build` en `docs.yml` con flag `-W` corre en cada PR
 - [ ] REQ-009 → `.readthedocs.yaml` válido; primer push a `main` resuelve URL pública
 - [ ] REQ-010 → `CONTRIBUTING.md` existe con sección "Documentation" y los 4 sub-puntos requeridos
-- [ ] REQ-011 → `docs/conf.py` declara `autodoc_mock_imports = ["PySide6"]`
+- [ ] REQ-011 → `docs/conf.py` excluye `tempify.gui*` del autodoc Y declara `autodoc_mock_imports = ["PySide6"]` defensivo; verificado por test `test_gui_module_absent_from_api_reference` que grep busca `tempify.gui` en HTML generado y exige cero matches
 - [ ] REQ-012 → `docs/conf.py` declara `nitpicky = True` y `nitpick_ignore` con justificación inline
 - [ ] REQ-013 → Test `test_html_lang_attribute_is_en` parsea `<html lang="en">` en páginas generadas
 - [ ] REQ-014 → Script `tools/check-attribution.sh` grep -ri sobre `claude\|copilot\|gpt\|chatgpt\|anthropic\|openai` en `.github/`, `docs/`, `CONTRIBUTING.md`, `CHANGELOG.md` y `git log` retorna cero matches
@@ -161,8 +178,10 @@ Trazabilidad REQ → test/verificación (cada REQ tiene al menos un check):
 ### Specs relacionadas
 
 - Depende de: ninguna funcional (la documentación es transversal).
-- Afecta a: [`cli`](../cli/requirements.md), [`gui`](../gui/requirements.md), [`core-interpolation`](../core-interpolation/requirements.md), [`pipeline`](../pipeline/requirements.md), [`io-handlers`](../io-handlers/requirements.md), [`validation`](../validation/requirements.md) — todas ven sus docstrings publicadas y sometidas a `ruff D`.
+- Cubre prioritariamente: [`ergonomic-api`](../ergonomic-api/requirements.md) — la API de v0.1.6 es el punto de entrada de la documentación y el quickstart de la portada.
+- Afecta a: [`cli`](../cli/requirements.md), [`core-interpolation`](../core-interpolation/requirements.md), [`pipeline`](../pipeline/requirements.md), [`io-handlers`](../io-handlers/requirements.md), [`validation`](../validation/requirements.md) — todas ven sus docstrings publicadas y sometidas a `ruff D`.
 - Coordina con: [`security`](../security/requirements.md) (la sección "Security" en CONTRIBUTING.md debe enlazar `SECURITY.md`).
+- Excluida en v0.1.6: [`gui`](../gui/requirements.md) — la aplicación de escritorio no entra en este ciclo de release; su documentación se difiere.
 
 ### ADRs referenciados
 
@@ -180,7 +199,7 @@ Trazabilidad REQ → test/verificación (cada REQ tiene al menos un check):
 
 | Riesgo | Probabilidad | Impacto | Mitigación |
 |---|---|---|---|
-| `autodoc` no logra importar `tempify.gui` por Qt en CI sin display | Alta | Medio | `autodoc_mock_imports = ["PySide6"]` (REQ-011) + exclusión condicional del módulo |
+| `autodoc` no logra importar `tempify.gui` por Qt en CI sin display | N/A en v0.1.6 | N/A | Exclusión completa de `tempify.gui` del autodoc (REQ-011). El mock de PySide6 queda como defensiva para futuros ciclos. |
 | Notebooks con datos pesados ralentizan el build CI más allá de NFR-002 | Media | Medio | Cachear ejecución (`nb_execution_mode = "cache"`); o commitear outputs y marcar `nb_execution_mode = "off"` para tutoriales pesados |
 | Typer auto-genera ayuda CLI que duplica `autodoc` | Media | Bajo | Excluir `tempify.cli.app` del autodoc o usar `sphinx-click` específico |
 | Doctests no determinísticos rompen reproducibilidad bit-exact (guardrail #6) | Media | Alto | REQ-015 + revisión manual de cada bloque `>>>` durante T08 |
