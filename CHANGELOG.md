@@ -15,6 +15,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Ver [ADR-0018](docs/adr/0018-classical-interpolator-catalog.md) para el roadmap completo.
 
+## [0.1.6] — 2026-05-18
+
+API ergonómica de conveniencia tipo `terra` de R. Permite cargar, inspeccionar,
+visualizar e interpolar un stack en pocas líneas desde el nivel de paquete.
+
+### Added
+
+- **`tempify.api`**: módulo nuevo con capa de conveniencia de alto nivel.
+  - `rast(path)` — carga un GeoTIFF multi-banda como `TempifyRast`; análogo a `terra::rast()`.
+  - `TempifyRast` — wrapper de `xr.DataArray` con `__repr__` tipo terra (llama a `raster_info()`)
+    y método `.str()` con info extendida (rango de valores, NaN, atributos).
+  - `plot(r, sub=None, cmap="viridis")` — grilla automática de bandas con colorbar compartida;
+    `sub` acepta índices 1-based como en `terra::plot(r, sub=1:16)`.
+  - `tempify(stack, from_freq, to_freq, method="pchip_mp", year=None)` — interpolación en
+    memoria (sin disco) del stack; retorna `TempifyRast` con dim `time` en orden `(time, y, x)`.
+- **Exportaciones de nivel de paquete**: `from tempify import rast, tempify, plot` ahora
+  funciona directamente desde `tempify.__init__`.
+
+### Specs
+
+- `specs/ergonomic-api/requirements.md` — requisitos EARS de la capa de conveniencia.
+- `specs/ergonomic-api/design.md` — contratos de interfaz y decisiones de diseño.
+- `specs/ergonomic-api/tasks.md` — tasks atómicas del ciclo de implementación.
+
+---
+
 ## [0.1.5] — 2026-05-18
 
 Release de experiencia de usuario para notebooks y tutoriales. Sin cambios en el
