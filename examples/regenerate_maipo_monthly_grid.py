@@ -26,6 +26,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import rioxarray  # noqa: F401
 import xarray as xr
+from matplotlib.colors import LinearSegmentedColormap
 from matplotlib.gridspec import GridSpec
 
 from tempify.pipeline import PipelineConfig, TempifyPipeline
@@ -37,7 +38,15 @@ ASSET_PATH = Path("docs/assets/maipo_monthly_grid.jpg")
 SHOW_MONTHS = [1, 4, 7, 10]
 MONTH_NAMES_ES = {1: "Enero", 4: "Abril", 7: "Julio", 10: "Octubre"}
 CMAP_TEMP = "RdYlBu_r"
-CMAP_DIFF = "RdBu_r"
+
+# Custom diverging palette: dark blue → blue → light blue → YELLOW center →
+# coral → red → dark red. The yellow center (not white) makes small
+# residuals visible against the white background of the figure.
+CMAP_DIFF = LinearSegmentedColormap.from_list(
+    "tempify_diff",
+    ["#08306b", "#2171b5", "#6baed6", "#ffeda0", "#fb6a4a", "#cb181d", "#67000d"],
+    N=256,
+)
 
 
 def main() -> None:
