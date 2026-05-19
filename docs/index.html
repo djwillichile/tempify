@@ -621,7 +621,7 @@
     <img src="assets/hero-stacks.jpg" alt="Stacks ráster transparentes con gradiente de temperatura sobre paisaje de montañas" loading="eager" />
   </div>
   <div class="container hero-content">
-    <div class="eyebrow"><span class="dot"></span>v0.1.4 · Py 3.11+ · ICTA Ltda.</div>
+    <div class="eyebrow"><span class="dot"></span>v0.1.6 · Py 3.11+ · ICTA Ltda.</div>
     <h1>Genera más datos<br />entre tus <span class="grad">datos existentes</span>.</h1>
     <p class="subtitle">
       <strong>tempify</strong> realiza densificación temporal sobre stacks ráster geoespaciales: convierte una serie mensual de 12 valores en una serie diaria de 365, preservando la media mensual con tolerancia &lt; 10⁻⁴ °C.
@@ -847,12 +847,12 @@
           <tr>
             <td><span class="method-name"><span class="swatch-bar" style="background:var(--m-akima)"></span>akima</span></td>
             <td>C¹ Akima 1970</td><td>Aproximada</td><td>Medio</td>
-            <td class="diff">— v0.1.4 —</td>
+            <td class="diff">agregado en v0.1.4</td>
           </tr>
           <tr>
             <td><span class="method-name"><span class="swatch-bar" style="background:var(--m-cubic)"></span>cubic</span></td>
             <td>C² spline natural</td><td>Aproximada</td><td>Medio</td>
-            <td class="diff">— v0.1.4 —</td>
+            <td class="diff">agregado en v0.1.4</td>
           </tr>
         </tbody>
       </table>
@@ -921,18 +921,15 @@
     --report ./out/report.md</pre>
       </div>
       <div class="qs-block">
-        <h4>3. API Python</h4>
-<pre class="code"><span class="kw">from</span> pathlib <span class="kw">import</span> Path
-<span class="kw">from</span> tempify.pipeline <span class="kw">import</span> PipelineConfig, TempifyPipeline
+        <h4>3. API Python ergonómica <span style="font-size: 13px; color: var(--text-soft); font-weight: 500;">· v0.1.6 · estilo terra (R)</span></h4>
+<pre class="code"><span class="kw">from</span> tempify <span class="kw">import</span> rast, tempify, plot
 
-cfg <span class="kw">=</span> <span class="fn">PipelineConfig</span>(
-    method<span class="kw">=</span><span class="str">"pchip_mp"</span>,
-    target_year<span class="kw">=</span><span class="num">2023</span>,
-    output_dir<span class="kw">=</span><span class="fn">Path</span>(<span class="str">"./out"</span>),
-)
-result <span class="kw">=</span> <span class="fn">TempifyPipeline</span>(cfg).<span class="fn">run</span>(<span class="fn">Path</span>(<span class="str">"./worldclim_chile/"</span>))
-<span class="fn">print</span>(result.outputs)        <span class="cmt"># NetCDF de 365 dias</span>
-<span class="fn">print</span>(result.report.method)  <span class="cmt"># 'pchip_mp'</span></pre>
+r  <span class="kw">=</span> <span class="fn">rast</span>(<span class="str">"worldclim_tmax.tif"</span>)   <span class="cmt"># cargar GeoTIFF multibanda</span>
+<span class="fn">print</span>(r)                              <span class="cmt"># info compacta tipo terra</span>
+<span class="fn">plot</span>(r)                               <span class="cmt"># grilla de bandas</span>
+
+r2 <span class="kw">=</span> <span class="fn">tempify</span>(r, from_freq<span class="kw">=</span><span class="str">"monthly"</span>, to_freq<span class="kw">=</span><span class="str">"daily"</span>, method<span class="kw">=</span><span class="str">"cubic"</span>)
+<span class="fn">plot</span>(r2, sub<span class="kw">=</span><span class="fn">range</span>(<span class="num">1</span>, <span class="num">17</span>))            <span class="cmt"># primeras 16 bandas diarias</span></pre>
       </div>
       <div class="qs-block">
         <h4>4. Verificación end-to-end</h4>
@@ -955,11 +952,11 @@ result <span class="kw">=</span> <span class="fn">TempifyPipeline</span>(cfg).<s
     <div class="tutorial-card">
       <div>
         <h3>01-getting-started.ipynb</h3>
-        <p>Quickstart con <code>pchip_mp</code> · Inspección del NetCDF de salida · Mapas diarios día por día · Línea de tiempo 3D con anclas mensuales destacadas · Comparación numérica de los 4 métodos · Renderizado del reporte de procedencia · Lectura crítica.</p>
+        <p>Quickstart con <code>pchip_mp</code> · Inspección del NetCDF de salida · Mapas diarios día por día · Línea de tiempo 3D con anclas mensuales destacadas · Comparación numérica de los 6 métodos · Renderizado del reporte de procedencia · Lectura crítica.</p>
         <div class="stats">
           <div class="stat"><span class="num">~3 min</span><span class="lbl">Tiempo de ejecución</span></div>
           <div class="stat"><span class="num">34</span><span class="lbl">Celdas</span></div>
-          <div class="stat"><span class="num">241</span><span class="lbl">Tests pasando</span></div>
+          <div class="stat"><span class="num">327</span><span class="lbl">Tests pasando</span></div>
         </div>
       </div>
       <div style="text-align: center;">
@@ -1015,7 +1012,7 @@ result <span class="kw">=</span> <span class="fn">TempifyPipeline</span>(cfg).<s
   title        = {tempify: Temporal densification
                  for geospatial raster stacks},
   year         = {2026},
-  version      = {0.1.4},
+  version      = {0.1.6},
   organization = {ICTA Ltda.},
   publisher    = {Zenodo},
   doi          = {10.5281/zenodo.20265222},
