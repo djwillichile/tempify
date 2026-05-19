@@ -15,10 +15,10 @@ Las versiones que reciben parches de seguridad son las **dos minor más reciente
 
 **Canales preferidos:**
 
-1. **GitHub Private Vulnerability Reporting** (recomendado): abrí un reporte privado en `https://github.com/djwillichile/tempify/security/advisories/new`. Se manejará confidencialmente con el mantenedor y co-asegurador antes de hacerse público.
+1. **GitHub Private Vulnerability Reporting** (recomendado): abre un reporte privado en `https://github.com/djwillichile/tempify/security/advisories/new`. Se manejará confidencialmente con el mantenedor y co-asegurador antes de hacerse público.
 2. **Email**: `contacto@icta.cl` — contacto institucional con redirección al mantenedor.
 
-Por favor incluí:
+Por favor incluye:
 
 - Descripción del problema y su impacto.
 - Pasos reproducibles (idealmente un caso mínimo).
@@ -46,7 +46,7 @@ Si el problema requiere coordinación con upstream (numpy, xarray, rasterio…),
 Para evitar reportes desencaminados:
 
 - **Volcado de path absoluto local** en mensajes de error (esperado en una librería que opera sobre archivos del usuario).
-- **DoS por input adversarial** (rásters maliciosamente formados que consumen memoria): tempify confía en `rasterio`/`GDAL` para parsing; reportá a esos proyectos directamente.
+- **DoS por input adversarial** (rásters maliciosamente formados que consumen memoria): tempify confía en `rasterio`/`GDAL` para parsing; reporta a esos proyectos directamente.
 - **CVEs en dependencias declaradas con `>=`** sin un escenario de ataque concreto contra tempify: registralos en Dependabot y se atenderán en el ciclo regular.
 
 ## Buenas prácticas para quien usa `tempify`
@@ -54,7 +54,7 @@ Para evitar reportes desencaminados:
 - Mantené `tempify` actualizado: `pip install --upgrade tempify`.
 - No corrás `tempify` con privilegios elevados sobre archivos no confiables.
 - Para procesamiento batch automático, considerá ejecutarlo en una **sandbox** (Docker, venv aislado).
-- Verificá el DOI del release citado (https://doi.org/10.5281/zenodo.20251750 para v0.1.2) antes de utilizar el código en investigación reproducible.
+- Verifica el DOI del release citado (https://doi.org/10.5281/zenodo.20251750 para v0.1.2) antes de utilizar el código en investigación reproducible.
 
 ---
 
