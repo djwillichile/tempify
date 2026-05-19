@@ -433,23 +433,38 @@
   pre.code .num { color: #fbbf24; }
   pre.code .pr  { color: var(--icta-green-light); user-select: none; }
 
-  /* === TUTORIAL CARD === */
+  /* === TUTORIAL CARDS GRID === */
+  .tutorials-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+  }
   .tutorial-card {
     background:
       linear-gradient(135deg, rgba(34, 197, 94, 0.06) 0%, rgba(34, 211, 238, 0.06) 50%, rgba(29, 78, 216, 0.06) 100%);
     border: 1px solid var(--line);
-    border-radius: 16px; padding: 36px;
-    display: grid; grid-template-columns: 2fr 1fr; gap: 28px; align-items: center;
+    border-radius: 16px; padding: 24px;
+    display: flex; flex-direction: column;
   }
-  .tutorial-card h3 { margin: 0 0 12px; font-size: 22px; color: var(--title); font-weight: 700; }
-  .tutorial-card p { margin: 0 0 18px; color: var(--text-muted); }
-  .tutorial-card .stats { display: flex; gap: 24px; flex-wrap: wrap; margin: 18px 0; }
+  .tutorial-card .badge {
+    display: inline-block; align-self: flex-start;
+    font-size: 10px; font-weight: 700;
+    letter-spacing: 0.08em; text-transform: uppercase;
+    background: rgba(34, 197, 94, 0.12);
+    color: var(--icta-green-dark);
+    padding: 4px 10px; border-radius: 999px;
+    margin: 0 0 14px;
+  }
+  .tutorial-card h3 { margin: 0 0 10px; font-size: 18px; color: var(--title); font-weight: 700; line-height: 1.3; }
+  .tutorial-card p { flex: 1; margin: 0 0 16px; color: var(--text-muted); font-size: 14px; line-height: 1.55; }
+  .tutorial-card .stats { display: flex; gap: 18px; flex-wrap: wrap; margin: 0 0 18px; }
   .stat .num {
-    display: block; font-size: 26px; font-weight: 800;
+    display: block; font-size: 20px; font-weight: 800;
     background: linear-gradient(135deg, var(--icta-green), var(--icta-teal));
     -webkit-background-clip: text; background-clip: text; color: transparent;
   }
-  .stat .lbl { font-size: 11px; color: var(--text-soft); letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; }
+  .stat .lbl { font-size: 10px; color: var(--text-soft); letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600; }
+  .tutorial-card .btn { width: 100%; justify-content: center; }
+  .tutorial-card .gh-link { font-size: 11px; color: var(--text-soft); text-align: center; margin-top: 10px; }
+  .tutorial-card .gh-link a { color: var(--text-muted); }
 
   /* === ROADMAP === */
   .roadmap {
@@ -511,6 +526,7 @@
     .container { padding: 0 20px; }
     .features { grid-template-columns: repeat(2, 1fr); }
     .roadmap-items { grid-template-columns: repeat(2, 1fr); }
+    .tutorials-grid { grid-template-columns: repeat(2, 1fr); }
     .hero h1 { font-size: 48px; }
     section { padding: 56px 0; }
   }
@@ -535,11 +551,11 @@
 
     .features { grid-template-columns: 1fr; }
     .roadmap-items { grid-template-columns: 1fr; }
+    .tutorials-grid { grid-template-columns: 1fr; }
     .roadmap { padding: 24px; }
-    .quickstart, .tutorial-card { grid-template-columns: 1fr; }
-    .tutorial-card { padding: 24px; }
-    .tutorial-card .stats { gap: 16px; }
-    .stat .num { font-size: 22px; }
+    .quickstart { grid-template-columns: 1fr; }
+    .tutorial-card { padding: 20px; }
+    .tutorial-card .stats { gap: 14px; }
 
     /* Methods table: scroll horizontal antes de romper layout */
     .methods { overflow-x: auto; }
@@ -947,27 +963,51 @@ r2 <span class="kw">=</span> <span class="fn">tempify</span>(r, from_freq<span c
   </div>
 </section>
 
-<!-- ===================== TUTORIAL ===================== -->
+<!-- ===================== TUTORIALS ===================== -->
 <section id="tutorial">
   <div class="container">
-    <h2>Tutorial en Google Colab</h2>
+    <h2>Tutoriales en Google Colab</h2>
     <p class="lede">
-      Notebook ejecutable que recorre la API pública end-to-end. Sin instalación local: arrancas directo desde el navegador.
+      Tres notebooks autocontenidos, ejecutables directo en el navegador. Sin instalación local.
     </p>
-    <div class="tutorial-card">
-      <div>
-        <h3>01-getting-started.ipynb</h3>
-        <p>Quickstart con <code>pchip_mp</code> · Inspección del NetCDF de salida · Mapas diarios día por día · Línea de tiempo 3D con anclas mensuales destacadas · Comparación numérica de los 6 métodos · Renderizado del reporte de procedencia · Lectura crítica.</p>
+    <div class="tutorials-grid">
+
+      <div class="tutorial-card">
+        <span class="badge">Quickstart</span>
+        <h3>01 · Getting Started</h3>
+        <p>Recorre la API pública end-to-end sobre un sample sintético tipo WorldClim de Chile Central. Quickstart con <code>pchip_mp</code>, comparación numérica de los 6 métodos, línea de tiempo 3D con anclas destacadas y reporte de procedencia.</p>
         <div class="stats">
-          <div class="stat"><span class="num">~3 min</span><span class="lbl">Tiempo de ejecución</span></div>
-          <div class="stat"><span class="num">34</span><span class="lbl">Celdas</span></div>
-          <div class="stat"><span class="num">327</span><span class="lbl">Tests pasando</span></div>
+          <div class="stat"><span class="num">~3 min</span><span class="lbl">Ejecución</span></div>
+          <div class="stat"><span class="num">31</span><span class="lbl">Celdas</span></div>
         </div>
-      </div>
-      <div style="text-align: center;">
         <a class="btn btn-primary" href="https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/01-getting-started.ipynb">Abrir en Colab <span class="arrow">→</span></a>
-        <div style="margin-top: 12px; font-size: 12px; color: var(--text-soft);">o <a href="https://github.com/djwillichile/tempify/blob/main/docs/tutorials/01-getting-started.ipynb">verlo en GitHub</a></div>
+        <div class="gh-link">o <a href="https://github.com/djwillichile/tempify/blob/main/docs/tutorials/01-getting-started.ipynb">verlo en GitHub</a></div>
       </div>
+
+      <div class="tutorial-card">
+        <span class="badge">Caso real</span>
+        <h3>02 · WorldClim Alto Maipo</h3>
+        <p>Aplica tempify a un stack real de WorldClim sobre el Alto Maipo (gradiente altitudinal 800–4000 m, contraste valle/cordillera ~30 °C). Validación visual de la conservación de anclas y reconstrucción del ciclo anual en dos píxeles extremos.</p>
+        <div class="stats">
+          <div class="stat"><span class="num">~4 min</span><span class="lbl">Ejecución</span></div>
+          <div class="stat"><span class="num">20</span><span class="lbl">Celdas</span></div>
+        </div>
+        <a class="btn btn-primary" href="https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/02-real-worldclim-maipo.ipynb">Abrir en Colab <span class="arrow">→</span></a>
+        <div class="gh-link">o <a href="https://github.com/djwillichile/tempify/blob/main/docs/tutorials/02-real-worldclim-maipo.ipynb">verlo en GitHub</a></div>
+      </div>
+
+      <div class="tutorial-card">
+        <span class="badge">v0.1.6 · estilo terra (R)</span>
+        <h3>03 · API ergonómica</h3>
+        <p><code>rast()</code> + <code>tempify()</code> + <code>plot()</code> en pocas líneas, inspirado en el paquete <code>terra</code> de R. Notebook autocontenido: genera un GeoTIFF de 12 bandas inline, sin descargas externas. Ideal para exploración rápida.</p>
+        <div class="stats">
+          <div class="stat"><span class="num">~2 min</span><span class="lbl">Ejecución</span></div>
+          <div class="stat"><span class="num">24</span><span class="lbl">Celdas</span></div>
+        </div>
+        <a class="btn btn-primary" href="https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/03-ergonomic-api.ipynb">Abrir en Colab <span class="arrow">→</span></a>
+        <div class="gh-link">o <a href="https://github.com/djwillichile/tempify/blob/main/docs/tutorials/03-ergonomic-api.ipynb">verlo en GitHub</a></div>
+      </div>
+
     </div>
   </div>
 </section>
