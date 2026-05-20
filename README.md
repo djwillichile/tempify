@@ -3,20 +3,22 @@
 > **Densificación temporal para stacks ráster geoespaciales.**
 > *Generate more data between your existing data.*
 
-<!-- Fila 1: estado, calidad, lenguaje, licencia, DOI -->
+<!-- Fila 1: estado, calidad, lenguaje, licencia, versión, DOI -->
 [![Tests](https://img.shields.io/badge/tests-330%20passing-brightgreen)](https://github.com/djwillichile/tempify/tree/main/tests)
 [![Coverage](https://img.shields.io/badge/coverage-91%25-brightgreen)](https://github.com/djwillichile/tempify)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12%20%7C%203.13-blue?logo=python&logoColor=white)](https://www.python.org)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Release](https://img.shields.io/github/v/release/djwillichile/tempify?label=release&color=22c55e)](https://github.com/djwillichile/tempify/releases/latest)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20297689.svg)](https://zenodo.org/records/20297689)
 
-<!-- Fila 2: stack tecnológica, tooling, actividad, documentación -->
+<!-- Fila 2: stack tecnológica, tooling, actividad, documentación, Colab -->
 [![xarray](https://img.shields.io/badge/xarray-powered-4c8cdf)](https://xarray.dev)
 [![Dask](https://img.shields.io/badge/Dask-out--of--core-eb6f1f)](https://www.dask.org)
 [![Code style: Ruff](https://img.shields.io/badge/code%20style-ruff-d7ff64)](https://docs.astral.sh/ruff/)
 [![Type checked: mypy](https://img.shields.io/badge/typed-mypy-1d6dba)](https://mypy-lang.org/)
 [![Last commit](https://img.shields.io/github/last-commit/djwillichile/tempify?color=8c5cf2&label=last%20commit)](https://github.com/djwillichile/tempify/commits/main)
 [![Docs](https://img.shields.io/badge/docs-djwillichile.github.io-22c55e)](https://djwillichile.github.io/tempify/)
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/github/djwillichile/tempify/blob/main/docs/tutorials/01-getting-started.ipynb)
 
 
 ## ¿Qué es?
