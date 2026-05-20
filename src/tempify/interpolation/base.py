@@ -286,7 +286,7 @@ class BaseInterpolator(ABC):
         ``tempify_monthly_anchor`` (the anchor convention used), and
         ``tempify_wraparound`` (climatological wraparound mode per ADR-0016).
         Concrete interpolators may attach additional attributes specific
-        to their method (e.g., ``rymes_myers_iterations`` per REQ-007).
+        to their method (e.g., ``rymes_myers_iterations_max`` per REQ-007).
         """
         out = result.copy()
         out.attrs["tempify_method"] = self.name

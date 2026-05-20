@@ -22,7 +22,9 @@ from tempify.validation.report import (
     CheckSeverity,
 )
 
-SMOOTH_METHODS: frozenset[str] = frozenset({"linear", "pchip", "pchip_mp", "fourier"})
+SMOOTH_METHODS: frozenset[str] = frozenset(
+    {"linear", "pchip", "pchip_mp", "fourier", "akima", "cubic"}
+)
 
 
 class MethodVariableCompatibilityChecker:

@@ -125,6 +125,13 @@ class TestPchipMpFacade:
         assert result.attrs["tempify_wraparound"] == "climatological_4pt"
         assert "rymes_myers_iterations_max" in result.attrs
         assert result.attrs["rymes_myers_convergence_tol"] == DEFAULT_RM_CONVERGENCE_TOL
+        # Spec design.md §5.3: convergence flag must be exposed (int 0/1
+        # for NetCDF attr compatibility) and 1 when every pixel converged
+        # strictly before the iteration cap.
+        assert result.attrs["rymes_myers_converged"] == 1
+        assert result.attrs["rymes_myers_iterations_max"] < result.attrs[
+            "rymes_myers_max_iterations_allowed"
+        ]
 
     def test_lazy_dask_evaluation_preserved(self, monthly_3x3_smooth: xr.DataArray) -> None:
         interp = PchipMeanPreservingInterpolator()

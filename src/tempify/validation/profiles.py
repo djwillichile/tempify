@@ -17,7 +17,9 @@ import yaml  # type: ignore[import-untyped]
 
 from tempify.validation.errors import UnknownVariableProfileError
 
-ALLOWED_METHODS: frozenset[str] = frozenset({"linear", "pchip", "pchip_mp", "fourier"})
+ALLOWED_METHODS: frozenset[str] = frozenset(
+    {"linear", "pchip", "pchip_mp", "fourier", "akima", "cubic"}
+)
 
 
 @dataclass(frozen=True, slots=True)
