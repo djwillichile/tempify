@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" role="img" aria-label="tempify brand mark">
+  <title>tempify</title>
+  <defs>
+    <linearGradient id="m1" x1="0" y1="0" x2="24" y2="24" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#16a34a"/>
+      <stop offset="1" stop-color="#1d4ed8"/>
+    </linearGradient>
+  </defs>
+  <path d="M2 18 C 6 6, 10 6, 12 12 S 18 18, 22 6" stroke="url(#m1)" stroke-width="2.5" fill="none" stroke-linecap="round"/>
+  <circle cx="6" cy="10" r="2" fill="#16a34a"/>
+  <circle cx="12" cy="12" r="2" fill="#14b8a6"/>
+  <circle cx="18" cy="14" r="2" fill="#1d4ed8"/>
+</svg>
