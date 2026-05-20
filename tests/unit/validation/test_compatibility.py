@@ -60,3 +60,21 @@ def test_force_override_for_non_precipitation_uses_compat003(
     result = MethodVariableCompatibilityChecker().check("fourier", profile, force=True)
     assert result.severity == CheckSeverity.WARN
     assert result.check_id == COMPAT_FORCE_OVERRIDE_USED
+
+
+@pytest.mark.parametrize("smooth_method", ["akima", "cubic"])
+def test_force_override_returns_precip_warn_for_akima_and_cubic(
+    precipitation_profile: VariableProfile, smooth_method: str
+) -> None:
+    """ADR-0018 + ADR-0004: akima and cubic are smooth splines that can
+    produce negatives, so forcing them on precipitation must emit the
+    precipitation-specific warning code, not the generic override code.
+    Regression for the SMOOTH_METHODS set previously missing both methods.
+    """
+    result = MethodVariableCompatibilityChecker().check(
+        smooth_method, precipitation_profile, force=True
+    )
+    assert result.severity == CheckSeverity.WARN
+    assert result.check_id == COMPAT_PRECIPITATION_SMOOTH
+    assert result.details["force_method_used"] is True
+    assert result.details["method"] == smooth_method

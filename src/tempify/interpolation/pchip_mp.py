@@ -50,11 +50,14 @@ class PchipMeanPreservingInterpolator(BaseInterpolator):
     Notes
     -----
     Per REQ-006 the system iterates until the maximum absolute residual
-    falls below ``convergence_tol``. Per REQ-007 the number of iterations
-    used is recorded in ``attrs['rymes_myers_iterations']`` on the output
-    DataArray. The midpoint convention (ADR-0015) governs only the
-    auxiliary node initialization; the monthly mean preservation is
-    independent of the anchor.
+    falls below ``convergence_tol``. Per REQ-007 the iteration count is
+    recorded on the output ``DataArray`` as the maximum observed across
+    all pixels in the chunk (``attrs['rymes_myers_iterations_max']``);
+    convergence status is reported as a boolean
+    (``attrs['rymes_myers_converged']``), ``True`` when no pixel
+    reached the iteration cap. The midpoint convention (ADR-0015) governs
+    only the auxiliary node initialization; the monthly mean preservation
+    is independent of the anchor.
     """
 
     name: ClassVar[str] = "pchip_mp"
@@ -132,6 +135,14 @@ class PchipMeanPreservingInterpolator(BaseInterpolator):
         out.attrs["rymes_myers_iterations_max"] = max_iters_observed[0]
         out.attrs["rymes_myers_convergence_tol"] = self.convergence_tol
         out.attrs["rymes_myers_max_iterations_allowed"] = self.max_iterations
+        # 1 iff every pixel converged strictly before the cap, 0 if any
+        # pixel hit ``max_iterations`` without satisfying
+        # ``max|error| < convergence_tol``. Per spec design.md §5.3. We
+        # use int (0/1) instead of bool because NetCDF attribute writers
+        # only accept numeric/string dtypes (``b1`` is rejected).
+        out.attrs["rymes_myers_converged"] = int(
+            max_iters_observed[0] < self.max_iterations
+        )
         return out
 
     @staticmethod
