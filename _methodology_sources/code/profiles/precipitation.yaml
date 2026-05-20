@@ -1,0 +1,10 @@
+name: precipitation
+canonical_name: precipitation_flux
+units: mm
+aliases: [prcp, pr, ppt, precip, precipitacion]
+allowed_methods: []
+physical_range:
+  min: 0.0
+  max: 2000.0
+acceptable_mean_error: 0.1
+description: "Precipitación acumulada mensual. Métodos suaves rechazados por defecto per ADR-0004; usar --force-method bajo responsabilidad del usuario."

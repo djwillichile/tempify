@@ -1,0 +1,10 @@
+name: solar_radiation
+canonical_name: surface_downwelling_shortwave_flux_in_air
+units: "W m-2"
+aliases: [srad, rsds, radiacion_solar]
+allowed_methods: [linear, pchip, pchip_mp, fourier, akima, cubic]
+physical_range:
+  min: 0.0
+  max: 1361.0
+acceptable_mean_error: 1.0
+description: "Radiación solar de onda corta incidente en superficie."

@@ -1,0 +1,228 @@
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Pendiente para v0.2.0+
+
+- `cubic_mp_lai_kaplan`: spline mean-preserving moderno per [Lai & Kaplan 2022, JTECH](https://journals.ametsoc.org/view/journals/atot/39/4/JTECH-D-21-0154.1.xml). Reemplazaría a Rymes-Myers como baseline mean-preserving.
+- Post-procesador `SavitzkyGolayPostProcessor` (nueva fase opcional del pipeline tras `interpolate`, antes de `validate_post`).
+- `WhittakerHendersonInterpolator` como alternativa flexible a `fourier` con preservación de momentos.
+
+Ver [ADR-0018](docs/adr/0018-classical-interpolator-catalog.md) para el roadmap completo.
+
+## [0.1.6] — 2026-05-18
+
+API ergonómica de conveniencia tipo `terra` de R. Permite cargar, inspeccionar,
+visualizar e interpolar un stack en pocas líneas desde el nivel de paquete.
+
+### Added
+
+- **`tempify.api`**: módulo nuevo con capa de conveniencia de alto nivel.
+  - `rast(path)` — carga un GeoTIFF multi-banda como `TempifyRast`; análogo a `terra::rast()`.
+  - `TempifyRast` — wrapper de `xr.DataArray` con `__repr__` tipo terra (llama a `raster_info()`)
+    y método `.str()` con info extendida (rango de valores, NaN, atributos).
+  - `plot(r, sub=None, cmap="viridis")` — grilla automática de bandas con colorbar compartida;
+    `sub` acepta índices 1-based como en `terra::plot(r, sub=1:16)`.
+  - `tempify(stack, from_freq, to_freq, method="pchip_mp", year=None)` — interpolación en
+    memoria (sin disco) del stack; retorna `TempifyRast` con dim `time` en orden `(time, y, x)`.
+- **Exportaciones de nivel de paquete**: `from tempify import rast, tempify, plot` ahora
+  funciona directamente desde `tempify.__init__`.
+
+### Specs
+
+- `specs/ergonomic-api/requirements.md` — requisitos EARS de la capa de conveniencia.
+- `specs/ergonomic-api/design.md` — contratos de interfaz y decisiones de diseño.
+- `specs/ergonomic-api/tasks.md` — tasks atómicas del ciclo de implementación.
+
+---
+
+## [0.1.5] — 2026-05-18
+
+Release de experiencia de usuario para notebooks y tutoriales. Sin cambios en el
+nucleo metodologico ni en los metodos de interpolacion existentes.
+
+### Added
+
+- **`tempify.datasets`**: modulo nuevo para datos sinteticos reproducibles tipo WorldClim.
+  - `create_worldclim_like_sample()` — genera 12 GeoTIFFs con nomenclatura WorldClim v2.1;
+    superficie espacial realista (gradiente altitudinal Andes, clusters gaussianos, textura
+    suavizada, ruido local). Reproducible via `seed`. Idempotente via `overwrite=False`.
+  - `read_monthly_stack()` — carga 12 GeoTIFFs mensuales como `xr.DataArray (month=12, y, x)`.
+  - `SANTIAGO_MONTHLY_TAVG` — climatologia de temperatura mensual para Santiago de Chile.
+- **`tempify.utils`**: helpers para cargar y filtrar outputs del pipeline.
+  - `open_tempify_output()` — abre el output de `TempifyPipeline.run()` detectando el formato
+    automaticamente (`.nc`, `.tif`, `.zarr`). Acepta `PipelineResult` o `Path`.
+  - `extract_daily_rasters()` — filtra un `DataArray` diario por meses, dias y/o ano.
+  - `get_anchor_dates()` — retorna las 12 fechas ancla mensuales (dia 15) para un ano.
+  - `raster_info()` — imprime resumen del DataArray estilo `terra::print(r)`: dimensiones,
+    resolucion, extension, CRS, capas o rango temporal, tipo de datos.
+- **`tempify.plotting`**: visualizaciones livianas para notebooks (matplotlib opcional).
+  - `plot_monthly_rasters()` — grilla 3x4 de los 12 GeoTIFFs mensuales con colorbar compartida.
+  - `plot_raster_timeseries()` — serie temporal de un pixel con scatter de anclas opcionales.
+  - `plot_temporal_stack_3d()` — stack raster 3D; anclas con borde rojo, interpoladas con
+    menor opacidad.
+- **Dependencia opcional `[viz]`**: `pip install tempify[viz]` agrega `matplotlib>=3.8`.
+- **Tutorial actualizado**: `docs/tutorials/01-getting-started.ipynb` — de ~800 lineas de
+  boilerplate a ~60 lineas de llamadas API (-760 lineas).
+
+## [0.1.4] — 2026-05-18
+
+Release de extensión del catálogo de interpoladores: dos métodos clásicos nuevos (akima, cubic) per [ADR-0018](docs/adr/0018-classical-interpolator-catalog.md). Sin breaking changes; los 4 métodos existentes (`linear`, `pchip`, `pchip_mp`, `fourier`) siguen byte-idénticos a v0.1.3.
+
+### Added
+
+- **`AkimaInterpolator`** (`src/tempify/interpolation/akima.py`): spline C¹ de Akima 1970 con cyclic option (dos wrap nodes per side, ADR-0016). Menos agresivo que PCHIP al aplanar máximos locales, menos overshoots que cubic. Envuelve `scipy.interpolate.Akima1DInterpolator`.
+- **`CubicSplineInterpolator`** (`src/tempify/interpolation/cubic.py`): spline natural C² (not-a-knot). Más suave que PCHIP, pero **puede overshoot entre nodos** — usar `pchip` o `pchip_mp` si la monotonicidad importa. Envuelve `scipy.interpolate.CubicSpline`.
+- Kernels nuevos en `_kernels.py`: `akima_kernel`, `cubic_kernel`, ambos con padding cíclico de 2 wrap nodes por lado.
+- 14 tests unitarios nuevos (`tests/unit/interpolation/test_akima.py`, `test_cubic.py`) cubriendo kernel + facade: input constante, pass-through de nodos, error sinusoidal acotado, extrapolación non-cyclic, NaN policy raise + propagate_all.
+- **ADR-0018**: catálogo extensible de interpoladores clásicos. Documenta las 8 familias revisadas (cubic, Akima, Makima, Lai-Kaplan, Savitzky-Golay, Whittaker-Henderson, GPR, STL) con sus tradeoffs y plan de release.
+- `tempify_method` attr ahora puede valer `"akima"` o `"cubic"`.
+- CLI: `tempify convert --method akima|cubic` acepta los nuevos métodos.
+- Perfiles de variable actualizados (`temperature`, `relative_humidity`, `solar_radiation`) para aceptar `akima` y `cubic`. `precipitation` los rechaza por defecto (consistente con [ADR-0004](docs/adr/0004-precipitation-policy.md)).
+
+### Changed
+
+- `InterpolationMethod` Literal ahora incluye 6 valores: `"linear" | "pchip" | "pchip_mp" | "fourier" | "akima" | "cubic"`.
+- Suite de tests: 241 → **257 passing** (1 skipped por extra opcional `zarr`).
+- Documentación landing + README: tabla de métodos extendida a 6 filas.
+- Notebook tutorial: loop de comparación Demo 2 ahora incluye los 6 métodos.
+
+## [0.1.3] — 2026-05-17
+
+- Capa 7 (GUI) basada en PySide6 (deferred del v0.1.0).
+- Empaquetado Windows (PyInstaller `--onedir` + Inno Setup) (deferred del v0.1.0).
+- Integración de redes neuronales pre-entrenadas (ClimaX, Pangu-Weather, FourCastNet) bajo patrón híbrido (clásico baseline + NN refinement). Ver [ADR-0017](docs/adr/0017-neural-interpolator-extensibility.md).
+- Workflows GitHub Actions (`pytest + ruff + mypy + gitleaks`), Dependabot, CodeQL — REQ-SEC-008.
+- `CODE_OF_CONDUCT.md` y `CONTRIBUTING.md` — REQ-SEC-007.
+- Tests automáticos `tests/security/` para REQ-SEC-002 / -005 / -006.
+
+## [0.1.3] — 2026-05-17
+
+Release de soporte multibanda nativo + caso real WorldClim + auditoría de seguridad + gobernanza mínima del repositorio público.
+
+### Added
+
+- **Soporte multibanda nativo en el pipeline**: `TemporalFrequencyResolver` gana una nueva sub-heurística Tier 3.b. Cuando `N=1` y el `.tif` tiene 12 bandas, el resolver infiere `climatological` sin que el usuario tenga que splittear el stack en 12 archivos. `TempifyPipeline._read` renombra automáticamente la dim `band` → `month` para multiband stacks de 12 capas. La nueva REQ-003b queda documentada en `specs/temporal-frequency-resolver/requirements.md`.
+- 2 tests unitarios nuevos en `tests/unit/detection/test_frequency.py` cubriendo el caso multibanda de 12 bandas (debe inferir climatological) y el caso single-band (debe caer al callback/raise).
+- Sample WorldClim real en `examples/data/worldclim_maipo_alto/wc1_6_maipo_alto_tavg_stack.tif` (220 KB, Alto Maipo, Andes centrales de Chile, EPSG:4326, 30 arc-sec).
+- **Segundo tutorial Colab** en `docs/tutorials/02-real-worldclim-maipo.ipynb` (18 celdas, ~640 KB): demuestra el soporte multibanda end-to-end sobre datos reales, mapas mensuales, 4 fechas diarias representativas, ciclo cordillera vs valle (−18 °C a +23 °C).
+- **Landing page: nueva sección "Caso real · Alto Maipo, Chile"** entre Métodos y Quickstart, con 3 figuras (input mensual / output diario / ciclo anual cordillera-vs-valle) y chips de metadatos. Las 3 figuras totalizan 213 KB en `docs/assets/`. Nav item "Caso real" agregado.
+- **Política de seguridad**: `SECURITY.md` con canal de reporte privado (GitHub PVR + email institucional), versiones soportadas, SLAs de respuesta. Cumple REQ-SEC-001.
+- **Spec de seguridad**: `specs/security/requirements.md` con 10 REQs (REQ-SEC-001 a REQ-SEC-010) cubriendo divulgación responsable, prohibición de patrones unsafe, version consistency, notebook hygiene, governance files, CI gating, supply chain. Indexada en `CLAUDE.md`.
+- **Reporte de auditoría**: `specs/_audit/2026-05-17-security-audit.md` con el resultado completo (0 críticos, 0 altos, 3 MED, 6 LOW). 5 hallazgos cerrados en este release; 4 quedan tracked para v0.2.0.
+
+### Fixed
+
+- **Drift de versión (H-001):** `pyproject.toml` declaraba `version = "0.1.0"` mientras `__version__` ya era `0.1.2`. Sincronizado a `0.1.3` en este release. Ahora `pip show tempify`, `tempify.__version__`, `CITATION.cff::version` y el tag de release coinciden bit-exactamente.
+- **Username del desarrollador filtrado en outputs cacheados (H-004):** sanitizadas 2 occurrences en `docs/tutorials/01-getting-started.ipynb`.
+
+### Changed
+
+- `src/tempify/__init__.py`: `__version__ "0.1.2" -> "0.1.3"`.
+- `pyproject.toml`: `version "0.1.0" -> "0.1.3"` (alineado).
+- `CITATION.cff`: `version "0.1.2" -> "0.1.3"`.
+
+## [0.1.2] — 2026-05-17
+
+Release de empaquetado, documentación y metadatos. Sin cambios funcionales en el código del paquete (`src/tempify/` queda byte-idéntico a v0.1.0/v0.1.1 más el bump de versión). El motivo principal de este release es:
+
+1. **Disparar el webhook de Zenodo** (activado tras v0.1.1 y antes de v0.1.2) para que mintee un DOI sobre un release válido.
+2. **Arreglar el `CITATION.cff`** que tenía un ORCID placeholder (`0000-0000-0000-0000`), causa de que Zenodo rechazara el ingest de v0.1.1.
+3. **Publicar la landing page** del proyecto en GitHub Pages (`docs/index.html`).
+
+### Added
+
+- `docs/index.html`: landing page en español con la paleta corporativa de ICTA digital (verde→teal→cyan→azul, fondo claro). Incluye hero con imagen de stacks ráster, visualización SVG inline de la curva PCHIP sobre la climatología real de Santiago (12 nodos mensuales → 365 valores diarios), tabla numérica de los 4 métodos, quickstart con código copy-paste, tarjeta del tutorial Colab, sección de roadmap v0.2.0 destacando el ejecutable Windows, footer con BibTeX y datos de contacto institucional. Servida desde GitHub Pages en `https://djwillichile.github.io/tempify/`.
+- `docs/assets/`: directorio para los assets visuales del landing.
+- `docs/.nojekyll`: para que GH Pages sirva el HTML directamente sin pasar por Jekyll.
+- Notebook tutorial: nueva celda 4.2.bis con la curva PCHIP del píxel central renderizada con la paleta ICTA (réplica matplotlib del SVG del landing).
+- Notebook tutorial: la sección 4.5 (línea de tiempo 3D) ahora muestra 4 anclas mensuales (Ene/Abr/Jul/Oct) marcadas en rojo + 3 días interpolados translúcidos a cada lado, en lugar de 10 días consecutivos. La separación entre grupos hace evidente el rol de las anclas como "puntos de referencia" entre los que `tempify` interpola.
+
+### Fixed
+
+- `CITATION.cff`: ORCID placeholder `0000-0000-0000-0000` reemplazado por el real (`0000-0002-7864-4899`); afiliación institucional canónica tomada del repo `geoia-bloom-huasco` (ICTA Ltda. + Universidad San Sebastián); campos `version` y `date-released` actualizados a `0.1.2` / `2026-05-17`. Verificado contra schema CFF 1.2.0 con `cffconvert --validate`.
+- `README.md`: nuevo bloque "Citar este software" con cita corta estilo APA + BibTeX expandido (nombre completo, ORCID, organization, version 0.1.2).
+
+### Changed
+
+- `src/tempify/__init__.py`: `__version__ = "0.1.1" -> "0.1.2"`.
+
+## [0.1.1] — 2026-05-17
+
+Release de documentación. Sin cambios en el código de producción del paquete (`src/tempify/` queda idéntico a v0.1.0 más el bump de versión); todos los cambios están en `docs/tutorials/`.
+
+### Added
+
+- `docs/tutorials/01-getting-started.ipynb`: Colab notebook que recorre la API pública de `tempify` end-to-end sobre el sample sintético WorldClim Chile Central. Demuestra los cuatro métodos de interpolación, la garantía de conservación de media de `pchip_mp` (≤ 1e-4 °C, observado ~1e-14 °C en float64), y el reporte de procedencia. Reproducible en Google Colab vía badge "Open in Colab". Incluye:
+  - Quickstart con `pchip_mp`.
+  - Inspección del NetCDF de salida y grid 3×4 con un raster por mes.
+  - Línea de tiempo 3D con anclas mensuales destacadas para visualizar la interpolación entre nodos observados.
+  - Comparación numérica de los 4 métodos (tabla `max|diff|` + RMSE).
+  - Renderizado del `ProcessingReport` en Markdown y JSON.
+  - Lectura crítica (cuándo usar cada método, convención midpoint, climatological wraparound, política de precipitación).
+
+### Fixed
+
+- Notebook tutorial: corrección del slicing por píxel (`daily[:, 15, 15]` → `daily.isel(y=15, x=15)`); el writer NetCDF produce dims `(y, x, time)`, no `(time, y, x)`, por lo que la indexación posicional devolvía silenciosamente una columna espacial en vez de la serie temporal. Plots de Demo 1 y Demo 2 ahora muestran las 4 series diarias recorriendo el año completo.
+- Notebook tutorial: corrección del texto sobre `fourier` que afirmaba conservación de media "por construcción"; la métrica empírica (~0.83 °C con 3 armónicos) refuta esa afirmación. El markdown ahora dirige a `pchip_mp` cuando se requiere conservación estricta.
+- Notebook tutorial: celda de instalación cambiada de `subprocess.check_call` con `--quiet` (que ocultaba errores de pip en Colab) a la magic `%pip install` de IPython con output visible.
+
+## [0.1.0] — 2026-05-16
+
+Primera versión funcional del paquete `tempify` con todas las capas
+fundacionales implementadas, testeadas y documentadas bajo régimen
+Spec-Driven Development (SDD) estricto.
+
+### Capacidades
+
+- **4 métodos de interpolación temporal** mensual → diaria, con vectorización Dask y manejo configurable de NaN (`raise`, `propagate_all`, `skip_pixel`):
+  - `LinearInterpolator`
+  - `PchipInterpolator` (Fritsch-Carlson, C¹ en frontera Dic-Ene).
+  - `PchipMeanPreservingInterpolator` (Rymes-Myers iterativo con conservación de media mensual <1e-4 °C).
+  - `FourierInterpolator` (FFT multi-armónico configurable 1..5).
+- **Climatological wraparound** como feature de primer orden (ADR-0016): extensión artificial del dominio anual de 12 a ≥14 puntos para mejor contexto en métodos suaves; off-switch explícito vía `wraparound=False`.
+- **Convención midpoint** (ADR-0015 / CF Conventions §7.4): valores mensuales se colocan en el centroide del mes; configurable vía `monthly_anchor`.
+- **Capa I/O** con readers para GeoTIFF y NetCDF (single + multi-file collection con orden NFC determinista) y writers CF-compliant (NetCDF zlib L4, GeoTIFF multi-banda + collection con sidecar JSON de procedencia, Zarr opcional).
+- **Capa Detection** con `StructureDetector` (mode A/B/C + filtrado de sidecars) y `TemporalFrequencyResolver` (4 tiers: CF metadata → filename pattern → count heuristic → callback, con 4 parsers built-in: WorldClim, CHELSA, CHIRPS, ERA5).
+- **Capa Validation** con `GeospatialCoherenceValidator` (tolerancias canónicas ADR-0009), `MethodVariableCompatibilityChecker` (rechazo de precipitación con métodos suaves per ADR-0004, override expreso `--force-method`), `PostInterpolationValidator` (mean preservation, cyclic continuity, physical range, NaN integrity), `StatisticalReporter`, `VariableProfileMatcher` con 4 perfiles built-in (temperature, precipitation, relative_humidity, solar_radiation).
+- **Capa Pipeline** con `TempifyPipeline.run()` orquestando 7 fases canónicas (detect, validate_geospatial, validate_compatibility, interpolate, validate_post, write, generate_report) + `ProcessingReport` con procedencia completa (versión, timestamp UTC, MD5 inputs/outputs, configuración).
+- **Capa CLI** con 5 subcomandos (`convert`, `inspect`, `validate`, `profiles list`, `version`) en español, exit codes canónicos (0/1/2/3/130), confirmación tipeada para `--force-method`.
+
+### Decisiones documentadas (ADRs)
+
+17 ADRs cubriendo: xarray como abstracción central, Dask scheduler, Typer CLI, política de precipitación, PySide6 (diferido), PyInstaller (diferido), política de reproducibilidad (strict vs parallel), confidence scoring, tolerancias geo, conservación de media, ADRs 0011-0013 diferidos, naming TempifyPipeline, posicionamiento midpoint, climatological wraparound, y extensibilidad para NN bajo patrón híbrido.
+
+### Métricas verificables
+
+- **241 tests** pasando (1 skipped por extra opcional `zarr`).
+- **Cobertura ≥ 91%** (umbral mínimo configurado: 85%).
+- `mypy --strict` limpio en 46 módulos.
+- `ruff check` + `ruff format` limpios.
+- Demo end-to-end reproducible en `examples/` (WorldClim sintético Chile Central).
+
+### Compatibilidad
+
+- Python 3.11, 3.12, 3.13.
+- Linux, macOS, Windows.
+- Wheel pip-instalable; conda-forge planificado para v0.1.x.
+
+### Contacto
+
+Mantenido por [ICTA Ltda.](https://icta.cl), Santiago, Chile.
+
+## [Pre-historia]
+
+### Initial project structure (pre-v0.1.0)
+
+- Proyecto inicializado bajo el nombre **tempify** (temporal densification for raster stacks).
+- Estructura siguiendo Spec-Driven Development + Harness Engineering.
+- Steering docs: product, tech, architecture, conventions, harness rules.
+- 9 specs SDD (requirements + design + tasks).
+- Slash commands: `/spec-init`, `/spec-design`, `/spec-tasks`, `/impl`, `/review`.
+- Git hooks: pre-commit, pre-task, post-task.
+- Referencia de validación empírica: experimento Quinta Normal 2020 + stack 3×3 sintético.
