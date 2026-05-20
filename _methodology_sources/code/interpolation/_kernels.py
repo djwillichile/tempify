@@ -1,0 +1,334 @@
+"""Internal 1D NumPy kernels used by the interpolators.
+
+Each kernel takes a 1D array of 12 monthly values plus the monthly
+anchor positions (``x_in``, days-of-year) and the target positions
+(``x_out``, days-of-year) and returns a 1D array of N target values.
+
+The kernels are pure NumPy / SciPy with no xarray dependency. They are
+intended to be wrapped by :func:`xarray.apply_ufunc` with
+``dask='parallelized'`` to vectorize over the spatial dimensions.
+
+Notes
+-----
+- All kernels accept ``cyclic: bool``. With ``cyclic=True`` December
+  and January are treated as adjacent (the year wraps around).
+- NaN handling is the caller's responsibility (the kernels operate on
+  arrays that have already been filtered per ``nan_policy``).
+"""
+
+from __future__ import annotations
+
+import numpy as np
+from numpy.typing import NDArray
+
+
+def linear_kernel(
+    m: NDArray[np.floating],
+    x_in: NDArray[np.floating],
+    x_out: NDArray[np.floating],
+    cyclic: bool,
+) -> NDArray[np.floating]:
+    """Piecewise linear interpolation on the year axis.
+
+    Parameters
+    ----------
+    m : numpy.ndarray
+        12 monthly values placed at ``x_in``.
+    x_in : numpy.ndarray
+        Strictly increasing array of length 12 with the day-of-year of
+        each monthly anchor (per ADR-0015).
+    x_out : numpy.ndarray
+        Strictly increasing array of length N (typically 365 or 366)
+        with the target days-of-year.
+    cyclic : bool
+        If ``True``, treat the year as periodic: linear interpolation
+        wraps from December to January with period equal to
+        ``x_out[-1] - x_out[0] + 1``. If ``False``, apply constant
+        extrapolation outside ``[x_in[0], x_in[-1]]`` per REQ-005a.
+
+    Returns
+    -------
+    numpy.ndarray
+        Array of length ``len(x_out)`` with the interpolated values.
+    """
+    if cyclic:
+        # Period is total number of days in the target year. Extend the
+        # input with one wrap node on each side so np.interp can use them
+        # linearly. The +1 accounts for "inclusive bounds".
+        period = float(x_out[-1] - x_out[0]) + 1.0
+        x_left = x_in[-1] - period
+        x_right = x_in[0] + period
+        m_ext = np.concatenate(([m[-1]], m, [m[0]]))
+        x_ext = np.concatenate(([x_left], x_in, [x_right]))
+        return np.asarray(np.interp(x_out, x_ext, m_ext))
+    return np.asarray(np.interp(x_out, x_in, m))
+
+
+def pchip_kernel(
+    m: NDArray[np.floating],
+    x_in: NDArray[np.floating],
+    x_out: NDArray[np.floating],
+    cyclic: bool,
+) -> NDArray[np.floating]:
+    """Piecewise cubic Hermite (Fritsch-Carlson) interpolation on the year axis.
+
+    Parameters
+    ----------
+    m : numpy.ndarray
+        12 monthly values placed at ``x_in``.
+    x_in : numpy.ndarray
+        Strictly increasing array of length 12 with the day-of-year of
+        each monthly anchor.
+    x_out : numpy.ndarray
+        Strictly increasing array of length N with target days-of-year.
+    cyclic : bool
+        If True, treat the year as periodic. Per design section 5.2 the
+        input nodes are padded with two wrap nodes on each side so that
+        SciPy's PCHIP delivers C1 continuity at the December-January
+        boundary. If False, SciPy's natural extrapolation is used for
+        out-of-range positions per REQ-005b.
+
+    Returns
+    -------
+    numpy.ndarray
+        Array of length ``len(x_out)`` with the interpolated values.
+    """
+    from scipy.interpolate import PchipInterpolator as ScipyPchip  # type: ignore[import-untyped]
+
+    if cyclic:
+        period = float(x_out[-1] - x_out[0]) + 1.0
+        m_ext = np.concatenate(([m[-2], m[-1]], m, [m[0], m[1]]))
+        x_ext = np.concatenate(
+            (
+                [x_in[-2] - period, x_in[-1] - period],
+                x_in,
+                [x_in[0] + period, x_in[1] + period],
+            )
+        )
+        pchip = ScipyPchip(x_ext, m_ext, extrapolate=False)
+        return np.asarray(pchip(x_out))
+    pchip = ScipyPchip(x_in, m, extrapolate=True)
+    return np.asarray(pchip(x_out))
+
+
+def pchip_mp_kernel(
+    m: NDArray[np.floating],
+    x_in: NDArray[np.floating],
+    x_out: NDArray[np.floating],
+    day_to_month: NDArray[np.integer],
+    cyclic: bool,
+    convergence_tol: float,
+    max_iterations: int,
+) -> tuple[NDArray[np.floating], int]:
+    """PCHIP baseline + Rymes-Myers iterative mean-preserving correction.
+
+    The algorithm follows the simplest variant of Rymes & Myers (2001):
+
+    1. Initialize daily values with a PCHIP interpolation of the monthly
+       midpoints (auxiliary nodes, per ADR-0010 nivel 1).
+    2. Iteratively compute the reconstructed monthly means from the daily
+       values, find the residual ``error_m = original_m - reconstructed_m``
+       per month, and distribute the residual uniformly across the days of
+       that month.
+    3. Stop when ``max |error_m| < convergence_tol`` or after
+       ``max_iterations`` rounds.
+
+    Parameters
+    ----------
+    m : numpy.ndarray
+        12 monthly values to preserve.
+    x_in : numpy.ndarray
+        Day-of-year of each monthly anchor (length 12).
+    x_out : numpy.ndarray
+        Day-of-year targets (length N).
+    day_to_month : numpy.ndarray
+        Integer array of length N mapping each output day to its month
+        index in [0, 11].
+    cyclic : bool
+        Forwarded to the PCHIP baseline initialization (per REQ-004 and
+        ADR-0016 wraparound).
+    convergence_tol : float
+        Maximum absolute residual accepted in the variable's units.
+    max_iterations : int
+        Hard cap on iterations (safety guard).
+
+    Returns
+    -------
+    tuple[numpy.ndarray, int]
+        ``(daily_values, iterations_used)``. The second element is the
+        number of correction iterations applied; ``0`` means the PCHIP
+        baseline already met the tolerance.
+    """
+    daily = pchip_kernel(m, x_in, x_out, cyclic=cyclic).copy()
+    iterations_used = 0
+    for iteration in range(1, max_iterations + 1):
+        recon = np.zeros(m.size, dtype=np.float64)
+        counts = np.zeros(m.size, dtype=np.int64)
+        for i in range(daily.size):
+            mo = int(day_to_month[i])
+            recon[mo] += daily[i]
+            counts[mo] += 1
+        recon = recon / counts
+        errors = m - recon
+        max_err = float(np.max(np.abs(errors)))
+        if max_err < convergence_tol:
+            iterations_used = iteration - 1
+            break
+        for i in range(daily.size):
+            mo = int(day_to_month[i])
+            daily[i] += errors[mo]
+        iterations_used = iteration
+    return daily, iterations_used
+
+
+def akima_kernel(
+    m: NDArray[np.floating],
+    x_in: NDArray[np.floating],
+    x_out: NDArray[np.floating],
+    cyclic: bool,
+) -> NDArray[np.floating]:
+    """Akima 1970 piecewise cubic Hermite interpolation on the year axis.
+
+    Akima's method produces a C1 spline that is less aggressive than
+    PCHIP at flattening peaks but with fewer overshoots than natural
+    cubic splines. Useful for variables with brief excursions that
+    PCHIP would over-smooth (per ADR-0018).
+
+    Parameters
+    ----------
+    m : numpy.ndarray
+        12 monthly values placed at ``x_in``.
+    x_in : numpy.ndarray
+        Strictly increasing array of length 12 with the day-of-year of
+        each monthly anchor.
+    x_out : numpy.ndarray
+        Strictly increasing array of length N with target days-of-year.
+    cyclic : bool
+        If True, treat the year as periodic. Like ``pchip_kernel``, we
+        pad the input nodes with two wrap nodes on each side so that
+        the C1 join across the December-January boundary is correct.
+
+    Returns
+    -------
+    numpy.ndarray
+        Array of length ``len(x_out)`` with the interpolated values.
+    """
+    from scipy.interpolate import Akima1DInterpolator  # type: ignore[import-untyped]
+
+    if cyclic:
+        period = float(x_out[-1] - x_out[0]) + 1.0
+        m_ext = np.concatenate(([m[-2], m[-1]], m, [m[0], m[1]]))
+        x_ext = np.concatenate(
+            (
+                [x_in[-2] - period, x_in[-1] - period],
+                x_in,
+                [x_in[0] + period, x_in[1] + period],
+            )
+        )
+        akima = Akima1DInterpolator(x_ext, m_ext)
+        return np.asarray(akima(x_out))
+    akima = Akima1DInterpolator(x_in, m)
+    return np.asarray(akima(x_out, extrapolate=True))
+
+
+def cubic_kernel(
+    m: NDArray[np.floating],
+    x_in: NDArray[np.floating],
+    x_out: NDArray[np.floating],
+    cyclic: bool,
+) -> NDArray[np.floating]:
+    """Natural cubic spline interpolation on the year axis.
+
+    Uses ``scipy.interpolate.CubicSpline`` with periodic boundary
+    conditions when ``cyclic=True`` (the spline value and its first
+    two derivatives match at year start/end). Otherwise uses the
+    default ``not-a-knot`` boundary. Cubic splines provide C2
+    continuity but **can overshoot** between knots; use ``pchip`` if
+    monotonicity matters (per ADR-0018).
+
+    Parameters
+    ----------
+    m : numpy.ndarray
+        12 monthly values placed at ``x_in``.
+    x_in : numpy.ndarray
+        Strictly increasing array of length 12 with the day-of-year of
+        each monthly anchor.
+    x_out : numpy.ndarray
+        Strictly increasing array of length N with target days-of-year.
+    cyclic : bool
+        If True, use periodic boundary conditions. Per the scipy spec
+        this requires ``m[0] == m[-1]`` exactly — since this is rarely
+        the case for monthly climatologies, we pad with the wrap node
+        on each side (same pattern as ``pchip_kernel``).
+
+    Returns
+    -------
+    numpy.ndarray
+        Array of length ``len(x_out)`` with the interpolated values.
+    """
+    from scipy.interpolate import CubicSpline  # type: ignore[import-untyped]
+
+    if cyclic:
+        period = float(x_out[-1] - x_out[0]) + 1.0
+        m_ext = np.concatenate(([m[-2], m[-1]], m, [m[0], m[1]]))
+        x_ext = np.concatenate(
+            (
+                [x_in[-2] - period, x_in[-1] - period],
+                x_in,
+                [x_in[0] + period, x_in[1] + period],
+            )
+        )
+        spline = CubicSpline(x_ext, m_ext, bc_type="not-a-knot", extrapolate=False)
+        return np.asarray(spline(x_out))
+    spline = CubicSpline(x_in, m, bc_type="not-a-knot", extrapolate=True)
+    return np.asarray(spline(x_out))
+
+
+def fourier_kernel(
+    m: NDArray[np.floating],
+    x_in: NDArray[np.floating],
+    x_out: NDArray[np.floating],
+    n_harmonics: int,
+) -> NDArray[np.floating]:
+    """Truncated Fourier series interpolation via numpy.fft.rfft.
+
+    The 12 monthly inputs are treated as periodic samples of an annual
+    signal. The first ``n_harmonics`` positive-frequency coefficients
+    (plus the DC term) are kept and used to synthesize values at
+    arbitrary daily positions. Fourier is inherently periodic so there
+    is no separate cyclic vs non-cyclic mode; the FFT semantics handle
+    the year wraparound implicitly (per ADR-0016 stamp ``fft_implicit``).
+
+    Parameters
+    ----------
+    m : numpy.ndarray
+        12 monthly values (FFT requires uniformly spaced samples; we
+        treat the monthly anchors as approximately uniform — the small
+        non-uniformity from midpoint dates per ADR-0015 is absorbed via
+        the explicit ``x_in`` re-projection below).
+    x_in : numpy.ndarray
+        Day-of-year of each monthly anchor (length 12).
+    x_out : numpy.ndarray
+        Day-of-year targets (length N).
+    n_harmonics : int
+        Number of positive-frequency harmonics to retain. Must be in
+        ``[FOURIER_MIN_HARMONICS, FOURIER_MAX_HARMONICS]``. The DC term
+        is always kept.
+
+    Returns
+    -------
+    numpy.ndarray
+        Array of length ``len(x_out)`` with the reconstructed values.
+    """
+    n = m.size
+    coeffs = np.fft.rfft(m)
+    period = float(x_out[-1] - x_out[0]) + 1.0
+    t = (x_out - x_in[0]) / period * n
+    result = np.full(x_out.size, float(np.real(coeffs[0])) / n, dtype=np.float64)
+    max_k = min(n_harmonics, n // 2)
+    for k in range(1, max_k + 1):
+        c = coeffs[k]
+        factor = 2.0 / n if (n % 2 != 0 or k < n // 2) else 1.0 / n
+        angle = 2.0 * np.pi * k * t / n
+        result += factor * (float(np.real(c)) * np.cos(angle) - float(np.imag(c)) * np.sin(angle))
+    return result

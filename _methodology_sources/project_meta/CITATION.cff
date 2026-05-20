@@ -1,0 +1,122 @@
+cff-version: 1.2.0
+message: "Si usas tempify en investigación, por favor cita el software como sigue."
+title: "tempify: Temporal densification for geospatial raster stacks"
+type: software
+authors:
+  - family-names: Fuentes-Jaque
+    given-names: Guillermo S.
+    orcid: https://orcid.org/0000-0002-7864-4899
+    email: guillermo.f1990@gmail.com
+    affiliation: >-
+      Instituto de Ciencias y Tecnología Ambiental ICTA Ltda., Chile.
+      Facultad de Ingeniería, Universidad San Sebastián, Chile.
+      Magíster en Gestión Territorial de Recursos Naturales,
+      Ingeniero en Recursos Naturales Renovables, Universidad de Chile.
+      Científico de datos geoespaciales · Consultor ambiental · Docente universitario.
+contact:
+  - name: "ICTA Ltda."
+    email: contacto@icta.cl
+    website: "https://icta.cl"
+    tel: "+56 9 9292 4314"
+abstract: >-
+  tempify realiza densificación temporal de stacks ráster geoespaciales:
+  toma una serie muestreada a baja frecuencia (típicamente 12 valores mensuales)
+  y genera una serie densa (365 o 366 valores diarios) preservando propiedades
+  estadísticas críticas como la conservación de la media mensual. Aplicable a
+  productos como WorldClim, CHELSA, CRU-TS, TerraClimate.
+keywords:
+  - geospatial
+  - raster
+  - temporal-densification
+  - interpolation
+  - climate
+  - worldclim
+  - xarray
+  - python
+license: MIT
+repository-code: "https://github.com/djwillichile/tempify"
+url: "https://djwillichile.github.io/tempify/"
+version: "0.1.6"
+date-released: "2026-05-18"
+doi: "10.5281/zenodo.20297689"
+identifiers:
+  - type: doi
+    value: "10.5281/zenodo.20297689"
+    description: "Versión 0.1.6 archivada en Zenodo (DOI específico de esta release)"
+  - type: doi
+    value: "10.5281/zenodo.20277280"
+    description: "Versión 0.1.5 archivada en Zenodo (release anterior, conservado para trazabilidad)"
+  - type: doi
+    value: "10.5281/zenodo.20265222"
+    description: "Versión 0.1.4 archivada en Zenodo (release anterior, conservado para trazabilidad)"
+  - type: doi
+    value: "10.5281/zenodo.20259997"
+    description: "Versión 0.1.3 archivada en Zenodo (release anterior, conservado para trazabilidad)"
+  - type: doi
+    value: "10.5281/zenodo.20251750"
+    description: "Versión 0.1.2 archivada en Zenodo (release anterior, conservado para trazabilidad)"
+references:
+  - type: article
+    authors:
+      - family-names: Rymes
+        given-names: M. D.
+      - family-names: Myers
+        given-names: D. R.
+    title: "Mean preserving algorithm for smoothly interpolating averaged data"
+    journal: "Solar Energy"
+    volume: 71
+    issue: 4
+    year: 2001
+    start: 225
+    end: 231
+  - type: article
+    authors:
+      - family-names: Fritsch
+        given-names: F. N.
+      - family-names: Carlson
+        given-names: R. E.
+    title: "Monotone piecewise cubic interpolation"
+    journal: "SIAM Journal on Numerical Analysis"
+    volume: 17
+    issue: 2
+    year: 1980
+    start: 238
+    end: 246
+    doi: "10.1137/0717021"
+  - type: article
+    authors:
+      - family-names: Akima
+        given-names: Hiroshi
+    title: "A New Method of Interpolation and Smooth Curve Fitting Based on Local Procedures"
+    journal: "Journal of the ACM"
+    volume: 17
+    issue: 4
+    year: 1970
+    start: 589
+    end: 602
+    doi: "10.1145/321607.321609"
+  - type: book
+    authors:
+      - family-names: de Boor
+        given-names: Carl
+    title: "A Practical Guide to Splines (Applied Mathematical Sciences, vol. 27)"
+    publisher:
+      name: Springer-Verlag
+      city: New York
+    year: 1978
+    isbn: "978-0-387-95366-3"
+  - type: article
+    authors:
+      - family-names: Lai
+        given-names: Leo O.
+      - family-names: Kaplan
+        given-names: Jed O.
+    title: "A Fast Mean-Preserving Spline for Interpolating Interval Data"
+    journal: "Journal of Atmospheric and Oceanic Technology"
+    volume: 39
+    issue: 4
+    year: 2022
+    start: 503
+    end: 512
+    doi: "10.1175/JTECH-D-21-0154.1"
+    notes: "Planificado para v0.2.0 como método cubic_mp_lai_kaplan (ver ADR-0018)."
